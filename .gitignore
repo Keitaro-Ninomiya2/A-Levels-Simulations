@@ -1,0 +1,5 @@
+R_libs/
+output/
+*.rds
+*.pdf
+.Rhistory
