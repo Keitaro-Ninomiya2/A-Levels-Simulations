@@ -1113,9 +1113,253 @@ cat("\n")
 
 
 # ==============================================================================
+# 6d. SECTOR-SPECIFIC REGRESSIONS
+# ==============================================================================
+# The global model pools all sectors, so the loss function is dominated by
+# State (60%) and Academy (33%). Independent schools (7%) may get poorly
+# estimated covariate effects. Fitting separate models per sector ensures
+# each sector's beta is optimised for its own grade distribution.
+# ==============================================================================
+
+cat("[8] Fitting sector-specific models...\n")
+
+student_type <- school_dt$school_type[sid]
+P_BASE_CAP_SEP <- 0.85
+sector_model_results <- list()
+
+for (stype in c("State", "Academy", "Independent")) {
+  cat(sprintf("\n  --- %s ---\n", stype))
+
+  # --- Subset data ---
+  s_mask     <- which(student_type == stype)
+  s_orig_ids <- sort(unique(sid[s_mask]))
+  J_s        <- length(s_orig_ids)
+  id_map     <- match(sid[s_mask], s_orig_ids)
+
+  s_sid  <- id_map
+  s_dcov <- d_covid[s_mask]
+  s_y    <- y[s_mask]
+  s_Z    <- Z_base[s_mask, , drop = FALSE]
+  N_s    <- length(s_y)
+
+  cat(sprintf("    N=%s students, J=%d schools\n",
+              format(N_s, big.mark = ","), J_s))
+
+  # --- Model A: Sector MLE ---
+  cat("    MLE...")
+  t0 <- proc.time()
+  fit_sA <- sparse_block_irls(s_sid, s_dcov, s_Z, s_y, use_covid_cov = TRUE)
+  cat(sprintf(" [%.1fs]\n", (proc.time() - t0)["elapsed"]))
+
+  se_sA <- compute_block_se(s_sid, s_dcov, s_Z, fit_sA,
+                            use_covid_cov = TRUE, ridge = 0)
+  eb_alpha_sA <- eb_shrink(fit_sA$alpha, se_sA$se_alpha)
+  eb_delta_sA <- eb_shrink(fit_sA$delta, se_sA$se_delta)
+
+  # --- Model B: Sector LASSO ---
+  cat("    LASSO...")
+  t0 <- proc.time()
+
+  school_sp_s <- sparseMatrix(i = seq_len(N_s), j = s_sid, x = 1,
+                              dims = c(N_s, J_s))
+  covid_idx_s <- which(s_dcov == 1L)
+  covid_sp_s  <- sparseMatrix(i = covid_idx_s, j = s_sid[covid_idx_s],
+                              x = 1, dims = c(N_s, J_s))
+  Z_covid_sp_s <- as(s_dcov * s_Z, "dgCMatrix")
+  Z_base_sp_s  <- as(s_Z, "dgCMatrix")
+  X_s <- cbind(school_sp_s, covid_sp_s, Z_base_sp_s, Z_covid_sp_s)
+  rm(school_sp_s, covid_sp_s, Z_base_sp_s, Z_covid_sp_s)
+
+  pf_s <- c(rep(0, 2L * J_s), rep(1, 2L * p))
+  glm_fit_s <- glmnet(x = X_s, y = s_y, family = "binomial",
+                      alpha = 1, penalty.factor = pf_s, intercept = FALSE,
+                      standardize = FALSE, thresh = 1e-7, maxit = 1e5)
+
+  dev_s  <- deviance(glm_fit_s)
+  df_s   <- glm_fit_s$df
+  bic_s  <- dev_s + log(N_s) * df_s
+  best_s <- which.min(bic_s)
+
+  cf_s    <- coef(glm_fit_s, s = glm_fit_s$lambda[best_s])
+  coefs_s <- as.numeric(cf_s)[-1]
+  gamma_sB <- coefs_s[(2L * J_s + 1):(2L * J_s + 2L * p)]
+  selected_cov_s <- which(gamma_sB != 0)
+
+  cat(sprintf(" [%.1fs] selected %d/%d covs\n",
+              (proc.time() - t0)["elapsed"], length(selected_cov_s), 2L * p))
+
+  fit_sB <- list(alpha   = coefs_s[1:J_s],
+                 delta   = coefs_s[(J_s + 1):(2L * J_s)],
+                 gamma_b = gamma_sB[1:p],
+                 gamma_c = gamma_sB[(p + 1):(2L * p)])
+  se_sB <- compute_block_se(s_sid, s_dcov, s_Z, fit_sB,
+                            use_covid_cov = TRUE, ridge = 0)
+  eb_alpha_sB <- eb_shrink(fit_sB$alpha, se_sB$se_alpha)
+  eb_delta_sB <- eb_shrink(fit_sB$delta, se_sB$se_delta)
+
+  rm(X_s, glm_fit_s, cf_s, coefs_s)
+
+  # --- Model C: Sector Post-LASSO ---
+  cat("    Post-LASSO...")
+  t0 <- proc.time()
+
+  mandatory_s  <- c(1:4, (p + 1):(p + 4))
+  keep_s       <- sort(unique(c(selected_cov_s, mandatory_s)))
+  keep_base_s  <- keep_s[keep_s <= p]
+  keep_covid_s <- keep_s[keep_s > p] - p
+  p_post_b_s   <- length(keep_base_s)
+  p_post_c_s   <- length(keep_covid_s)
+
+  Z_post_comb_s <- cbind(s_Z[, keep_base_s, drop = FALSE],
+                         s_dcov * s_Z[, keep_covid_s, drop = FALSE])
+
+  fit_sC <- sparse_block_irls(s_sid, s_dcov, Z_post_comb_s, s_y,
+                              use_covid_cov = FALSE)
+  cat(sprintf(" [%.1fs]\n", (proc.time() - t0)["elapsed"]))
+
+  fit_sC_se <- list(alpha = fit_sC$alpha, delta = fit_sC$delta,
+                    gamma_b = fit_sC$gamma_b, gamma_c = numeric(0))
+  se_sC <- compute_block_se(s_sid, s_dcov, Z_post_comb_s, fit_sC_se,
+                            use_covid_cov = FALSE, ridge = 0)
+  eb_alpha_sC <- eb_shrink(fit_sC$alpha, se_sC$se_alpha)
+  eb_delta_sC <- eb_shrink(fit_sC$delta, se_sC$se_delta)
+
+  rm(Z_post_comb_s)
+
+  # --- Sector mean covariate profile ---
+  sec_mean_c <- colMeans(s_Z)   # centered scale
+  sec_mean_r <- sec_mean_c + col_means  # raw scale
+
+  # --- Clamping: reduce GCSE if max p_base > 0.85 ---
+  alpha_max_s    <- max(school_dt$alpha_j[s_orig_ids])
+  non_gcse_shift <- params$eta["SES"]      * sec_mean_r[2] +
+                    params$eta["Minority"] * sec_mean_r[3] +
+                    params$eta["Gender"]   * sec_mean_r[4]
+  max_p0_s <- plogis(alpha_max_s + params$eta["GCSE_std"] * sec_mean_r[1] +
+                     non_gcse_shift)
+
+  if (max_p0_s > P_BASE_CAP_SEP) {
+    clamp_fn_s <- function(z) {
+      plogis(alpha_max_s + params$eta["GCSE_std"] * z + non_gcse_shift) -
+        P_BASE_CAP_SEP
+    }
+    gcse_clamp_s <- uniroot(clamp_fn_s, c(-5, sec_mean_r[1]), tol = 1e-8)$root
+    cat(sprintf("    Clamping GCSE from %.3f to %.3f (max p0: %.3f -> 0.850)\n",
+                sec_mean_r[1], gcse_clamp_s, max_p0_s))
+    sec_mean_r[1] <- gcse_clamp_s
+    sec_mean_r[5] <- gcse_clamp_s^2
+    sec_mean_r[6] <- gcse_clamp_s * sec_mean_r[2]
+    sec_mean_r[7] <- gcse_clamp_s * sec_mean_r[3]
+    sec_mean_r[8] <- gcse_clamp_s * sec_mean_r[4]
+    sec_mean_c <- sec_mean_r - col_means
+  }
+
+  # --- Reference shifts ---
+  # MLE (sector-specific)
+  mle_ref_base  <- drop(sec_mean_c %*% fit_sA$gamma_b)
+  mle_ref_covid <- drop(sec_mean_c %*% (fit_sA$gamma_b + fit_sA$gamma_c))
+
+  # Post-LASSO (sector-specific)
+  post_ref_base  <- drop(sec_mean_c[keep_base_s] %*%
+                         fit_sC$gamma_b[1:p_post_b_s])
+  post_ref_covid <- post_ref_base +
+    drop(sec_mean_c[keep_covid_s] %*%
+         fit_sC$gamma_b[(p_post_b_s + 1):(p_post_b_s + p_post_c_s)])
+
+  # Truth: only 4 true covariates + school-specific COVID biases
+  true_ref_base <- params$eta["GCSE_std"] * sec_mean_r[1] +
+                   params$eta["SES"]      * sec_mean_r[2] +
+                   params$eta["Minority"] * sec_mean_r[3] +
+                   params$eta["Gender"]   * sec_mean_r[4]
+
+  true_ref_covid_common <-
+    (params$eta["GCSE_std"] + params$delta_eta["GCSE_std"]) * sec_mean_r[1] +
+    (params$eta["SES"]      + params$delta_eta["SES"])      * sec_mean_r[2] +
+    (params$eta["Minority"] + params$delta_eta["Minority"]) * sec_mean_r[3] +
+    (params$eta["Gender"]   + params$delta_eta["Gender"])   * sec_mean_r[4]
+  true_covid_bias <- school_dt$beta_ses_j[s_orig_ids] * sec_mean_r[2] +
+                     school_dt$beta_min_j[s_orig_ids] * sec_mean_r[3]
+
+  # --- Build sector result table ---
+  s_alpha <- school_dt$alpha_j[s_orig_ids]
+  s_delta <- school_dt$delta_alpha_j[s_orig_ids]
+
+  dt_s <- data.table(
+    school_id   = s_orig_ids,
+    school_type = factor(stype, levels = c("State", "Academy", "Independent")),
+    true_alpha  = s_alpha,
+    true_delta  = s_delta,
+    # Truth
+    sep_true_p0  = plogis(s_alpha + true_ref_base),
+    sep_true_p1  = plogis(s_alpha + s_delta + true_ref_covid_common +
+                          true_covid_bias),
+    # MLE
+    sep_mle_p0   = plogis(eb_alpha_sA + mle_ref_base),
+    sep_mle_p1   = plogis(eb_alpha_sA + eb_delta_sA + mle_ref_covid),
+    # Post-LASSO
+    sep_post_p0  = plogis(eb_alpha_sC + post_ref_base),
+    sep_post_p1  = plogis(eb_alpha_sC + eb_delta_sC + post_ref_covid)
+  )
+
+  sector_model_results[[stype]] <- dt_s
+  gc(verbose = FALSE)
+}
+
+# --- Combine sector results ---
+sep_results <- rbindlist(sector_model_results)
+
+sep_results[, sep_true_raw := sep_true_p1 - sep_true_p0]
+sep_results[, sep_true_rrr := sep_true_raw / (1 - sep_true_p0)]
+sep_results[, sep_mle_raw  := sep_mle_p1  - sep_mle_p0]
+sep_results[, sep_mle_rrr  := sep_mle_raw  / (1 - sep_mle_p0)]
+sep_results[, sep_post_raw := sep_post_p1 - sep_post_p0]
+sep_results[, sep_post_rrr := sep_post_raw / (1 - sep_post_p0)]
+
+# Merge into main results table
+sep_cols <- c("school_id", "sep_true_p0", "sep_true_p1", "sep_true_raw",
+              "sep_true_rrr", "sep_mle_p0", "sep_mle_p1", "sep_mle_raw",
+              "sep_mle_rrr", "sep_post_p0", "sep_post_p1", "sep_post_raw",
+              "sep_post_rrr")
+results <- merge(results, sep_results[, ..sep_cols], by = "school_id")
+
+# Bin assignments for merged results (ensure they exist)
+results[, alpha_pctl := frank(true_alpha) / .N]
+results[, bin := cut(alpha_pctl, breaks = seq(0, 1, 0.05),
+                     labels = FALSE, include.lowest = TRUE)]
+results[, bin_center := (bin - 0.5) / 20]
+
+# --- Summary ---
+cat("\n\nSector-specific regression RRR by school type:\n")
+sep_summ <- results[, .(
+  True_RRR = round(mean(sep_true_rrr), 4),
+  MLE_RRR  = round(mean(sep_mle_rrr), 4),
+  Post_RRR = round(mean(sep_post_rrr), 4),
+  max_p0   = round(max(sep_true_p0), 3),
+  min_1mp0 = round(min(1 - sep_true_p0), 3)
+), by = school_type]
+print(sep_summ)
+
+cat("\nSector-specific regression denominator bias:\n")
+for (stype in c("State", "Academy", "Independent")) {
+  mask <- results$school_type == stype
+  db_mle  <- mean((1 - results$sep_mle_p0[mask])  - (1 - results$sep_true_p0[mask]))
+  db_post <- mean((1 - results$sep_post_p0[mask]) - (1 - results$sep_true_p0[mask]))
+  cat(sprintf("  %s: MLE %.5f, Post-LASSO %.5f\n", stype, db_mle, db_post))
+}
+
+cat("\nCorrelation with truth (sector-specific models):\n")
+cat(sprintf("  Raw increase:  MLE %.3f | Post %.3f\n",
+            cor(results$sep_mle_raw, results$sep_true_raw),
+            cor(results$sep_post_raw, results$sep_true_raw)))
+cat(sprintf("  RRR:           MLE %.3f | Post %.3f\n\n",
+            cor(results$sep_mle_rrr, results$sep_true_rrr),
+            cor(results$sep_post_rrr, results$sep_true_rrr)))
+
+
+# ==============================================================================
 # 7. PLOTS
 # ==============================================================================
-cat("[6] Generating plots...\n")
+cat("[9] Generating plots...\n")
 
 fig_dir <- file.path(Sys.getenv("HOME"), "A-Levels", "output", "figures")
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
@@ -1357,6 +1601,115 @@ plt_cal <- ggplot(plot_cal, aes(x = bin_center, y = mean_val,
 out_cal <- file.path(fig_dir, "RRR_scaled_calibration.pdf")
 ggsave(out_cal, plt_cal, width = 12, height = 6)
 cat(sprintf("  Figure 4 saved: %s\n", out_cal))
+
+
+# --- FIGURE 5: RRR (Sector-Specific Regressions) ---
+long_sep <- melt(
+  results,
+  id.vars      = c("bin_center", "school_type"),
+  measure.vars = c("sep_true_rrr", "sep_mle_rrr", "sep_post_rrr"),
+  variable.name = "Model",
+  value.name    = "rrr"
+)
+long_sep[, Model := factor(
+  sub("^sep_", "", sub("_rrr$", "", Model)),
+  levels = c("true", "mle", "post"),
+  labels = c("True", "MLE", "Post")
+)]
+plot_sep <- agg_with_se(long_sep, "rrr")
+
+sep_colors <- model_colors[c("True", "MLE", "Post")]
+sep_labels <- model_labels[c("True", "MLE", "Post")]
+sep_shapes <- model_shapes[c("True", "MLE", "Post")]
+
+plt_sep <- ggplot(plot_sep, aes(x = bin_center, y = mean_val,
+                                color = Model, shape = Model)) +
+  geom_ribbon(aes(ymin = mean_val - 1.96 * se_val,
+                  ymax = mean_val + 1.96 * se_val,
+                  fill = Model), alpha = 0.12, colour = NA) +
+  geom_line(aes(linetype = Model), linewidth = 0.9,
+            position = position_dodge(width = 0.01)) +
+  geom_point(size = 2, position = position_dodge(width = 0.01)) +
+  facet_wrap(~school_type) +
+  scale_color_manual(values = sep_colors, labels = sep_labels) +
+  scale_fill_manual(values = sep_colors, labels = sep_labels) +
+  scale_shape_manual(values = sep_shapes, labels = sep_labels) +
+  scale_linetype_manual(
+    values = c(True = "solid", MLE = "dashed", Post = "solid"),
+    labels = sep_labels
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title    = "RRR with Sector-Specific Regressions",
+    subtitle = "Separate models fitted per sector (State, Academy, Independent) to eliminate weighting bias",
+    x = "School Quality Percentile",
+    y = expression(frac(P[covid] - P[baseline], 1 - P[baseline]))
+  ) +
+  guides(color = guide_legend(NULL), fill = guide_legend(NULL),
+         shape = guide_legend(NULL), linetype = guide_legend(NULL)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(face = "bold", size = 12),
+    legend.text     = element_text(size = 10),
+    plot.subtitle   = element_text(size = 10)
+  )
+
+out_sep <- file.path(fig_dir, "RRR_sector_regressions.pdf")
+ggsave(out_sep, plt_sep, width = 12, height = 6)
+cat(sprintf("  Figure 5 saved: %s\n", out_sep))
+
+
+# --- FIGURE 6: Probability Increase (Sector-Specific Regressions) ---
+long_sep_raw <- melt(
+  results,
+  id.vars      = c("bin_center", "school_type"),
+  measure.vars = c("sep_true_raw", "sep_mle_raw", "sep_post_raw"),
+  variable.name = "Model",
+  value.name    = "prob_increase"
+)
+long_sep_raw[, Model := factor(
+  sub("^sep_", "", sub("_raw$", "", Model)),
+  levels = c("true", "mle", "post"),
+  labels = c("True", "MLE", "Post")
+)]
+plot_sep_raw <- agg_with_se(long_sep_raw, "prob_increase")
+
+plt_sep_raw <- ggplot(plot_sep_raw, aes(x = bin_center, y = mean_val,
+                                        color = Model, shape = Model)) +
+  geom_ribbon(aes(ymin = mean_val - 1.96 * se_val,
+                  ymax = mean_val + 1.96 * se_val,
+                  fill = Model), alpha = 0.12, colour = NA) +
+  geom_line(aes(linetype = Model), linewidth = 0.9,
+            position = position_dodge(width = 0.01)) +
+  geom_point(size = 2, position = position_dodge(width = 0.01)) +
+  facet_wrap(~school_type) +
+  scale_color_manual(values = sep_colors, labels = sep_labels) +
+  scale_fill_manual(values = sep_colors, labels = sep_labels) +
+  scale_shape_manual(values = sep_shapes, labels = sep_labels) +
+  scale_linetype_manual(
+    values = c(True = "solid", MLE = "dashed", Post = "solid"),
+    labels = sep_labels
+  ) +
+  labs(
+    title    = "COVID Grade Inflation: Raw Probability Increase (Sector-Specific Regressions)",
+    subtitle = "Inflation = P_covid - P_baseline  |  Separate models per sector",
+    x = "School Quality Percentile",
+    y = expression(P[covid] - P[baseline])
+  ) +
+  guides(color = guide_legend(NULL), fill = guide_legend(NULL),
+         shape = guide_legend(NULL), linetype = guide_legend(NULL)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(face = "bold", size = 12),
+    legend.text     = element_text(size = 10),
+    plot.subtitle   = element_text(size = 10)
+  )
+
+out_sep_raw <- file.path(fig_dir, "inflation_sector_regressions.pdf")
+ggsave(out_sep_raw, plt_sep_raw, width = 12, height = 6)
+cat(sprintf("  Figure 6 saved: %s\n", out_sep_raw))
 
 
 # --- Save results ---
