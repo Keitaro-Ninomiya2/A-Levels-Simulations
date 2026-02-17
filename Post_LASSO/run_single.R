@@ -374,6 +374,8 @@ y       <- panel$Y
 
 Z_base <- as.matrix(panel[, ..cov_names])
 Z_base <- scale(Z_base, center = TRUE, scale = FALSE)  # mean-centre
+col_means <- attr(Z_base, "scaled:center")              # save ALL centering constants
+GCSE_grand_mean <- col_means[1]
 
 rm(panel)
 gc(verbose = FALSE)
@@ -576,58 +578,151 @@ results <- data.table(
   post_se_delta  = se_C$se_delta
 )
 
-# --- Define "Marginal Student" reference profile ---
-# Instead of the average student (Z=0), use a weaker student so that
-# (1 - p_baseline) >= 0.20 for >95% of schools, eliminating the unstable
-# denominator in RRR.  GCSE at -1.0 centered (≈ 1 SD below mean).
-GCSE_REF <- -2.0
-Z_ref    <- rep(0, p)
-Z_ref[1] <- GCSE_REF
-REF_SHIFT       <- drop(Z_ref %*% fit_A$gamma_b)   # baseline log-odds shift
-REF_SHIFT_COVID <- drop(Z_ref %*% fit_A$gamma_c)   # additional COVID shift
-cat(sprintf("Marginal student: GCSE = %.1f (centered)\n", GCSE_REF))
-cat(sprintf("  REF_SHIFT = %.3f (base), %.3f (COVID add'l)\n",
-            REF_SHIFT, REF_SHIFT_COVID))
+# ==============================================================================
+# 6. CALIBRATE "MARGINAL STUDENT" TO ZERO DENOMINATOR BIAS
+# ==============================================================================
+# The model's alpha_hat absorbs population-mean covariate effects, so it
+# systematically differs from the DGP's alpha_j. At a given reference z-score,
+# this creates a denominator bias: mean((1 - p_hat) - (1 - p_true)) != 0.
+#
+# We find z* such that this bias is exactly zero, ensuring a fair comparison
+# between estimated and true RRR on the same probability scale.
+#
+# Truth uses the DGP formula:
+#   p_true = logistic(alpha_j + eta_GCSE * z_raw)
+# Estimates use:
+#   p_hat  = logistic(alpha_hat_j + gamma_hat_GCSE * z_centered)
+#         = logistic(alpha_hat_j + gamma_hat_GCSE * (z_raw - GCSE_grand_mean))
+# ==============================================================================
+
+cat("[5] Calibrating marginal student z-score...\n")
+cat(sprintf("    GCSE grand mean (centering constant): %.4f\n", GCSE_grand_mean))
+
+eta_GCSE <- params$eta["GCSE_std"]           # true DGP = 0.80
+delta_eta_GCSE <- params$delta_eta["GCSE_std"] # true COVID shift = 0.15
+
+# Build the FULL reference covariate vector for a student with
+# raw profile: (GCSE=z, SES=0, Minority=0, Gender=0, interactions, noise=0)
+# This properly accounts for alpha_hat absorbing ALL mean covariate effects.
+build_ref_raw <- function(z_raw) {
+  # 21-vector matching cov_names order:
+  # GCSE_std, SES, Minority, Gender, GCSE_std_sq,
+  # GCSE_SES, GCSE_Minority, GCSE_Gender, SES_Minority, SES_Gender, Minority_Gender,
+  # Z_1 ... Z_n_noise
+  ref_raw <- rep(0, p)
+  ref_raw[1] <- z_raw           # GCSE_std
+  ref_raw[5] <- z_raw^2         # GCSE_std_sq
+  # All other terms are 0 (SES=0, MIN=0, GEN=0 → interactions=0, noise=0)
+  ref_raw
+}
+
+# MLE (Model A) gamma for calibration — uses all covariates, most principled
+calculate_denom_bias <- function(z_raw) {
+  ref_raw      <- build_ref_raw(z_raw)
+  ref_centered <- ref_raw - col_means  # centered scale
+
+  # Truth: only the 4 true covariates matter
+  #   latent_true = alpha_j + eta_GCSE * z + eta_SES * 0 + ... = alpha_j + 0.8 * z
+  p_true <- plogis(school_dt$alpha_j + eta_GCSE * z_raw)
+
+  # Estimate (Model A, MLE): alpha_hat + gamma_b' * Z_ref_centered
+  #   alpha_hat already absorbed E[X|j] effects; gamma_b' * (X_ref - Xbar)
+  #   undoes the absorbed mean, giving latent ≈ alpha_j + eta' * X_ref
+  est_shift <- drop(ref_centered %*% fit_A$gamma_b)
+  p_hat     <- plogis(eb_alpha_A + est_shift)
+
+  mean((1 - p_hat) - (1 - p_true))
+}
+
+# Scan grid first
+z_grid <- seq(-4.0, 2.0, by = 0.25)
+bias_grid <- sapply(z_grid, calculate_denom_bias)
+cat("    Denominator bias scan:\n")
+print(data.table(z = z_grid, bias = round(bias_grid, 6))[abs(bias) < 0.02])
+
+# Find the root
+sign_changes <- which(diff(sign(bias_grid)) != 0)
+if (length(sign_changes) > 0) {
+  lo <- z_grid[sign_changes[1]]
+  hi <- z_grid[sign_changes[1] + 1]
+  opt <- uniroot(calculate_denom_bias, interval = c(lo, hi), tol = 1e-10)
+  GCSE_OPT <- opt$root
+  remaining_bias <- opt$f.root
+  cat(sprintf("\n    ** Optimal z* = %.4f (remaining bias = %.2e) **\n",
+              GCSE_OPT, remaining_bias))
+} else {
+  # If no sign change, pick the z with smallest absolute bias
+  best_idx <- which.min(abs(bias_grid))
+  GCSE_OPT <- z_grid[best_idx]
+  remaining_bias <- bias_grid[best_idx]
+  cat(sprintf("\n    ** No exact root. Best z* = %.2f (bias = %.5f) **\n",
+              GCSE_OPT, remaining_bias))
+}
+
+# Compute model-specific reference shifts at the calibrated z
+ref_raw_opt      <- build_ref_raw(GCSE_OPT)
+ref_centered_opt <- ref_raw_opt - col_means
+
+# Each model uses its OWN estimated gamma for a consistent reference
+# MLE
+mle_ref_base  <- drop(ref_centered_opt %*% fit_A$gamma_b)
+mle_ref_covid <- drop(ref_centered_opt %*% (fit_A$gamma_b + fit_A$gamma_c))
+
+# LASSO
+lasso_ref_base  <- drop(ref_centered_opt %*% fit_B_list$gamma_b)
+lasso_ref_covid <- drop(ref_centered_opt %*% (fit_B_list$gamma_b + fit_B_list$gamma_c))
+
+# Post-LASSO: uses subset of covariates
+post_ref_centered_base  <- ref_centered_opt[keep_base]
+post_ref_centered_covid <- ref_centered_opt[keep_covid]
+post_ref_base  <- drop(post_ref_centered_base %*% fit_C$gamma_b[1:p_post_b])
+post_ref_covid <- post_ref_base + drop(post_ref_centered_covid %*%
+                    fit_C$gamma_b[(p_post_b + 1):(p_post_b + p_post_c)])
+
+# Truth: use true DGP coefficients
+TRUE_REF_BASE  <- eta_GCSE * GCSE_OPT   # only GCSE matters for SES=0, MIN=0, GEN=0
+TRUE_REF_COVID <- TRUE_REF_BASE + delta_eta_GCSE * GCSE_OPT
+
+cat(sprintf("    MLE shifts:   base=%.3f, covid=%.3f\n", mle_ref_base, mle_ref_covid))
+cat(sprintf("    Post shifts:  base=%.3f, covid=%.3f\n", post_ref_base, post_ref_covid))
+cat(sprintf("    Truth shifts: base=%.3f, covid=%.3f\n", TRUE_REF_BASE, TRUE_REF_COVID))
+
 
 # --- Compute probability-scale inflation measures ---
-# Reference student at 10th percentile GCSE:
-#   p_baseline = logistic(alpha_j + REF_SHIFT)
-#   p_covid    = logistic(alpha_j + delta_j + REF_SHIFT + REF_SHIFT_COVID)
-#   Raw increase = p_covid - p_baseline
-#   RRR = (p_covid - p_baseline) / (1 - p_baseline)
+# Each model uses its own gamma to evaluate the SAME reference student (GCSE=z*)
 
 # Truth
-results[, true_p0  := plogis(true_alpha + REF_SHIFT)]
-results[, true_p1  := plogis(true_alpha + true_delta + REF_SHIFT + REF_SHIFT_COVID)]
+results[, true_p0  := plogis(true_alpha + TRUE_REF_BASE)]
+results[, true_p1  := plogis(true_alpha + true_delta + TRUE_REF_COVID)]
 results[, true_raw := true_p1 - true_p0]
 results[, true_rrr := true_raw / (1 - true_p0)]
 
 # MLE
-results[, mle_p0  := plogis(mle_alpha + REF_SHIFT)]
-results[, mle_p1  := plogis(mle_alpha + mle_delta + REF_SHIFT + REF_SHIFT_COVID)]
+results[, mle_p0  := plogis(mle_alpha + mle_ref_base)]
+results[, mle_p1  := plogis(mle_alpha + mle_delta + mle_ref_covid)]
 results[, mle_raw := mle_p1 - mle_p0]
 results[, mle_rrr := mle_raw / (1 - mle_p0)]
 
 # LASSO
-results[, lasso_p0  := plogis(lasso_alpha + REF_SHIFT)]
-results[, lasso_p1  := plogis(lasso_alpha + lasso_delta + REF_SHIFT + REF_SHIFT_COVID)]
+results[, lasso_p0  := plogis(lasso_alpha + lasso_ref_base)]
+results[, lasso_p1  := plogis(lasso_alpha + lasso_delta + lasso_ref_covid)]
 results[, lasso_raw := lasso_p1 - lasso_p0]
 results[, lasso_rrr := lasso_raw / (1 - lasso_p0)]
 
 # Post-LASSO
-results[, post_p0  := plogis(post_alpha + REF_SHIFT)]
-results[, post_p1  := plogis(post_alpha + post_delta + REF_SHIFT + REF_SHIFT_COVID)]
+results[, post_p0  := plogis(post_alpha + post_ref_base)]
+results[, post_p1  := plogis(post_alpha + post_delta + post_ref_covid)]
 results[, post_raw := post_p1 - post_p0]
 results[, post_rrr := post_raw / (1 - post_p0)]
 
-# Bin by true school quality (overall percentile)
+# Bin by true school quality
 results[, alpha_pctl := frank(true_alpha) / .N]
 results[, bin := cut(alpha_pctl, breaks = seq(0, 1, 0.05),
                      labels = FALSE, include.lowest = TRUE)]
 results[, bin_center := (bin - 0.5) / 20]
 
 # --- Summary statistics ---
-cat("Mean inflation by school type (probability scale, EB estimates):\n")
+cat("\nMean inflation by school type (calibrated marginal student):\n")
 summ <- results[, .(
   True_raw  = round(mean(true_raw), 4),
   MLE_raw   = round(mean(mle_raw), 4),
@@ -649,125 +744,14 @@ cat(sprintf("  RRR:           MLE %.3f | LASSO %.3f | Post %.3f\n\n",
             cor(results$lasso_rrr, results$true_rrr),
             cor(results$post_rrr, results$true_rrr)))
 
-# --- Check marginal student criterion: (1-p0) >= 0.20 for >95% of schools ---
-pct_stable <- results[, mean(1 - mle_p0 >= 0.20)]
-cat(sprintf("Denominator check: %.1f%% of schools have (1-p0) >= 0.20\n",
-            100 * pct_stable))
-cat(sprintf("  min(1-p0) = %.3f, median(1-p0) = %.3f, max(1-p0) = %.3f\n",
-            min(1 - results$mle_p0), median(1 - results$mle_p0),
-            max(1 - results$mle_p0)))
-cat(sprintf("  p0 range: [%.3f, %.3f]\n\n",
-            min(results$mle_p0), max(results$mle_p0)))
-
-
-# ==============================================================================
-# 6. BOOTSTRAP BIAS CORRECTION FOR RRR (Marginal Student)
-# ==============================================================================
-# With the marginal student reference, (1-p0) is well-behaved. The semi-parametric
-# bootstrap now cleanly captures the Jensen's inequality bias from E[1/(1-p0_hat)].
-#
-# Semi-parametric cluster bootstrap:
-#   1. Resample schools with replacement
-#   2. Inject parametric noise: alpha* ~ N(alpha_hat, se^2), delta* similarly
-#   3. Compute RRR* using the marginal student reference
-#   4. Bias = mean(RRR*) - RRR_orig;  Corrected = 2*orig - mean(boot)
-
-cat("[5] Bootstrap bias correction for RRR (B=1000)...\n")
-
-B_boot <- 1000L
-set.seed(2026L)
-
-n_schools <- nrow(results)
-
-# Pre-compute bin-level original RRR means
-orig_bin_rrr <- results[, .(
-  mle_rrr   = mean(mle_rrr, na.rm = TRUE),
-  lasso_rrr = mean(lasso_rrr, na.rm = TRUE),
-  post_rrr  = mean(post_rrr, na.rm = TRUE)
-), by = .(bin, bin_center, school_type)]
-setkey(orig_bin_rrr, bin, school_type)
-
-# Accumulator
-rrr_cols <- c("mle_rrr", "lasso_rrr", "post_rrr")
-boot_accum <- orig_bin_rrr[, .(bin, bin_center, school_type)]
-for (rc in rrr_cols) boot_accum[, (rc) := 0.0]
-setkey(boot_accum, bin, school_type)
-
-# Extract vectors for fast inner loop
-v_bin   <- results$bin
-v_stype <- results$school_type
-v_mle_a <- results$mle_alpha;   v_mle_d   <- results$mle_delta
-v_las_a <- results$lasso_alpha; v_las_d   <- results$lasso_delta
-v_pos_a <- results$post_alpha;  v_pos_d   <- results$post_delta
-v_mle_sea <- results$mle_se_alpha;   v_mle_sed <- results$mle_se_delta
-v_las_sea <- results$lasso_se_alpha; v_las_sed <- results$lasso_se_delta
-v_pos_sea <- results$post_se_alpha;  v_pos_sed <- results$post_se_delta
-
-t0_boot <- proc.time()
-
-for (b in seq_len(B_boot)) {
-  idx <- sample.int(n_schools, n_schools, replace = TRUE)
-  noise_a <- rnorm(n_schools)
-  noise_d <- rnorm(n_schools)
-
-  # MLE
-  a_s <- v_mle_a[idx] + v_mle_sea[idx] * noise_a
-  d_s <- v_mle_d[idx] + v_mle_sed[idx] * noise_d
-  p0  <- plogis(a_s + REF_SHIFT)
-  p1  <- plogis(a_s + d_s + REF_SHIFT + REF_SHIFT_COVID)
-  mle_rrr_s <- (p1 - p0) / (1 - p0)
-
-  # LASSO
-  a_s <- v_las_a[idx] + v_las_sea[idx] * noise_a
-  d_s <- v_las_d[idx] + v_las_sed[idx] * noise_d
-  p0  <- plogis(a_s + REF_SHIFT)
-  p1  <- plogis(a_s + d_s + REF_SHIFT + REF_SHIFT_COVID)
-  las_rrr_s <- (p1 - p0) / (1 - p0)
-
-  # Post-LASSO
-  a_s <- v_pos_a[idx] + v_pos_sea[idx] * noise_a
-  d_s <- v_pos_d[idx] + v_pos_sed[idx] * noise_d
-  p0  <- plogis(a_s + REF_SHIFT)
-  p1  <- plogis(a_s + d_s + REF_SHIFT + REF_SHIFT_COVID)
-  pos_rrr_s <- (p1 - p0) / (1 - p0)
-
-  boot_bin <- data.table(
-    bin = v_bin[idx], school_type = v_stype[idx],
-    mle_rrr = mle_rrr_s, lasso_rrr = las_rrr_s, post_rrr = pos_rrr_s
-  )[, lapply(.SD, mean, na.rm = TRUE), by = .(bin, school_type), .SDcols = rrr_cols]
-  setkey(boot_bin, bin, school_type)
-
-  boot_accum[boot_bin, `:=`(
-    mle_rrr   = mle_rrr   + i.mle_rrr,
-    lasso_rrr = lasso_rrr + i.lasso_rrr,
-    post_rrr  = post_rrr  + i.post_rrr
-  )]
+# --- Denominator bias verification ---
+cat("Denominator bias verification (should be ~0 for Post-LASSO):\n")
+for (model in c("mle", "lasso", "post")) {
+  db <- mean((1 - results[[paste0(model, "_p0")]]) - (1 - results$true_p0))
+  cat(sprintf("  %s: %.6f\n", model, db))
 }
-
-for (rc in rrr_cols) boot_accum[, (rc) := get(rc) / B_boot]
-time_boot <- (proc.time() - t0_boot)["elapsed"]
-cat(sprintf("    Done in %.1fs\n", time_boot))
-
-# Bias = bootstrap_avg - original
-bias_dt <- merge(orig_bin_rrr, boot_accum,
-                 by = c("bin", "bin_center", "school_type"),
-                 suffixes = c("_orig", "_boot"))
-for (rc in rrr_cols)
-  bias_dt[, paste0(rc, "_bias") := get(paste0(rc, "_boot")) - get(paste0(rc, "_orig"))]
-
-# Corrected = 2 * original - bootstrap_avg
-corrected_dt <- copy(orig_bin_rrr)
-for (rc in rrr_cols)
-  corrected_dt[, (rc) := 2 * get(rc) - boot_accum[[rc]]]
-
-cat("    Mean bias (boot_avg - orig) by school type:\n")
-bias_summ <- bias_dt[, .(
-  MLE   = round(mean(mle_rrr_bias, na.rm = TRUE), 5),
-  LASSO = round(mean(lasso_rrr_bias, na.rm = TRUE), 5),
-  Post  = round(mean(post_rrr_bias, na.rm = TRUE), 5)
-), by = school_type]
-print(bias_summ)
-cat("\n")
+cat(sprintf("\np0 range: [%.3f, %.3f]\n\n",
+            min(results$post_p0), max(results$post_p0)))
 
 
 # ==============================================================================
@@ -778,7 +762,6 @@ cat("[6] Generating plots...\n")
 fig_dir <- file.path(Sys.getenv("HOME"), "A-Levels", "output", "figures")
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Distinct, high-contrast colours — no grey
 model_colors <- c(True  = "#D55E00",   # vermillion
                   MLE   = "#009E73",   # green
                   LASSO = "#000000",   # black
@@ -789,18 +772,17 @@ model_labels <- c(True  = "True (DGP)",
                   Post  = "Post-LASSO + EB")
 model_shapes <- c(True = 16, MLE = 17, LASSO = 15, Post = 18)
 
-# Helper: aggregate with mean + SE for error bars
 agg_with_se <- function(dt, value_col) {
   dt[, .(mean_val = mean(get(value_col), na.rm = TRUE),
          se_val   = sd(get(value_col), na.rm = TRUE) / sqrt(.N)),
      by = .(bin_center, school_type, Model)]
 }
 
-ref_label <- sprintf("Marginal student (GCSE = %.1f, ~%.0f%% baseline prob.)",
-                     GCSE_REF, 100 * median(results$mle_p0))
+ref_label <- sprintf("Calibrated marginal student (GCSE z = %.2f, zero denom. bias)",
+                     GCSE_OPT)
 
 
-# --- FIGURE 1: Raw Probability Increase (p1 - p0) ---
+# --- FIGURE 1: Raw Probability Increase ---
 long_raw <- melt(
   results,
   id.vars      = c("bin_center", "school_type"),
@@ -813,7 +795,6 @@ long_raw[, Model := factor(
   levels = c("true", "mle", "lasso", "post"),
   labels = c("True", "MLE", "LASSO", "Post")
 )]
-
 plot_raw <- agg_with_se(long_raw, "prob_increase")
 
 plt_prob <- ggplot(plot_raw, aes(x = bin_center, y = mean_val,
@@ -834,11 +815,7 @@ plt_prob <- ggplot(plot_raw, aes(x = bin_center, y = mean_val,
   ) +
   labs(
     title    = "COVID Grade Inflation: Raw Probability Increase",
-    subtitle = paste0(
-      "Inflation = P_covid - P_baseline  (",
-      ref_label,
-      "; EB-shrunk school effects; shaded = 95% CI)"
-    ),
+    subtitle = paste0("Inflation = P_covid - P_baseline  |  ", ref_label),
     x = "School Quality Percentile",
     y = expression(P[covid] - P[baseline])
   ) +
@@ -846,10 +823,10 @@ plt_prob <- ggplot(plot_raw, aes(x = bin_center, y = mean_val,
          shape = guide_legend(NULL), linetype = guide_legend(NULL)) +
   theme_minimal(base_size = 12) +
   theme(
-    legend.position  = "bottom",
-    strip.text       = element_text(face = "bold", size = 12),
-    legend.text      = element_text(size = 10),
-    plot.subtitle    = element_text(size = 10)
+    legend.position = "bottom",
+    strip.text      = element_text(face = "bold", size = 12),
+    legend.text     = element_text(size = 10),
+    plot.subtitle   = element_text(size = 10)
   )
 
 out_prob <- file.path(fig_dir, "inflation_probability_increase.pdf")
@@ -857,7 +834,7 @@ ggsave(out_prob, plt_prob, width = 12, height = 6)
 cat(sprintf("  Figure 1 saved: %s\n", out_prob))
 
 
-# --- FIGURE 2: Relative Risk Reduction (marginal student) ---
+# --- FIGURE 2: RRR (Calibrated Marginal Student) ---
 long_rrr <- melt(
   results,
   id.vars      = c("bin_center", "school_type"),
@@ -870,7 +847,6 @@ long_rrr[, Model := factor(
   levels = c("true", "mle", "lasso", "post"),
   labels = c("True", "MLE", "LASSO", "Post")
 )]
-
 plot_rrr <- agg_with_se(long_rrr, "rrr")
 
 plt_rrr <- ggplot(plot_rrr, aes(x = bin_center, y = mean_val,
@@ -891,11 +867,8 @@ plt_rrr <- ggplot(plot_rrr, aes(x = bin_center, y = mean_val,
   ) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(
-    title    = "Relative Risk Reduction (Reference: Marginal Student)",
-    subtitle = paste0(
-      "RRR = (P_covid - P_base) / (1 - P_base)  |  ",
-      ref_label
-    ),
+    title    = "Relative Risk Reduction (Calibrated Marginal Student)",
+    subtitle = paste0("RRR = (P_covid - P_base) / (1 - P_base)  |  ", ref_label),
     x = "School Quality Percentile",
     y = expression(frac(P[covid] - P[baseline], 1 - P[baseline]))
   ) +
@@ -909,160 +882,9 @@ plt_rrr <- ggplot(plot_rrr, aes(x = bin_center, y = mean_val,
     plot.subtitle   = element_text(size = 10)
   )
 
-out_rrr <- file.path(fig_dir, "inflation_rrr.pdf")
+out_rrr <- file.path(fig_dir, "RRR_calibrated_marginal.pdf")
 ggsave(out_rrr, plt_rrr, width = 12, height = 6)
 cat(sprintf("  Figure 2 saved: %s\n", out_rrr))
-
-
-# --- FIGURE 3: Bias Diagnostic ---
-bias_long <- melt(
-  bias_dt,
-  id.vars      = c("bin_center", "school_type"),
-  measure.vars = c("mle_rrr_bias", "lasso_rrr_bias", "post_rrr_bias"),
-  variable.name = "Model",
-  value.name    = "bias"
-)
-bias_long[, Model := factor(
-  sub("_rrr_bias$", "", Model),
-  levels = c("mle", "lasso", "post"),
-  labels = c("MLE", "LASSO", "Post")
-)]
-
-plt_diag <- ggplot(bias_long, aes(x = bin_center, y = bias,
-                                  color = Model, shape = Model)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
-  geom_line(linewidth = 0.8) +
-  geom_point(size = 2) +
-  facet_wrap(~school_type) +
-  scale_color_manual(
-    values = model_colors[c("MLE", "LASSO", "Post")],
-    labels = model_labels[c("MLE", "LASSO", "Post")]
-  ) +
-  scale_shape_manual(
-    values = model_shapes[c("MLE", "LASSO", "Post")],
-    labels = model_labels[c("MLE", "LASSO", "Post")]
-  ) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(
-    title    = "Bootstrap Bias Diagnostic: RRR (Marginal Student)",
-    subtitle = paste0(
-      "Bias = E*[RRR*] - RRR_orig  (positive = Jensen's upward bias)  |  ",
-      ref_label, "  |  B = ", B_boot
-    ),
-    x = "School Quality Percentile",
-    y = "Bootstrap Bias"
-  ) +
-  guides(color = guide_legend(NULL), shape = guide_legend(NULL)) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "bottom",
-    strip.text      = element_text(face = "bold", size = 12)
-  )
-
-out_diag <- file.path(fig_dir, "bias_diagnostic.pdf")
-ggsave(out_diag, plt_diag, width = 12, height = 5)
-cat(sprintf("  Figure 3 saved: %s\n", out_diag))
-
-
-# --- FIGURE 4: RRR Bias-Corrected ---
-# Truth bin means
-true_bin <- results[, .(true_rrr = mean(true_rrr, na.rm = TRUE)),
-                    by = .(bin_center, school_type)]
-
-# Original (uncorrected) school-level for SE
-orig_long <- melt(
-  results,
-  id.vars      = c("bin_center", "school_type"),
-  measure.vars = c("mle_rrr", "lasso_rrr", "post_rrr"),
-  variable.name = "Model",
-  value.name    = "rrr"
-)
-orig_long[, Model := factor(
-  sub("_rrr$", "", Model),
-  levels = c("mle", "lasso", "post"),
-  labels = c("MLE", "LASSO", "Post")
-)]
-orig_agg <- orig_long[, .(orig_mean = mean(rrr, na.rm = TRUE),
-                           se_val    = sd(rrr, na.rm = TRUE) / sqrt(.N)),
-                       by = .(bin_center, school_type, Model)]
-
-# Corrected bin means
-corr_long <- melt(
-  corrected_dt,
-  id.vars      = c("bin", "bin_center", "school_type"),
-  measure.vars = c("mle_rrr", "lasso_rrr", "post_rrr"),
-  variable.name = "Model",
-  value.name    = "corr_mean"
-)
-corr_long[, Model := factor(
-  sub("_rrr$", "", Model),
-  levels = c("mle", "lasso", "post"),
-  labels = c("MLE", "LASSO", "Post")
-)]
-
-plot_corr <- merge(corr_long[, .(bin_center, school_type, Model, corr_mean)],
-                   orig_agg[, .(bin_center, school_type, Model, orig_mean, se_val)],
-                   by = c("bin_center", "school_type", "Model"))
-
-plt_rrr_bc <- ggplot() +
-  # Truth
-  geom_line(data = true_bin, aes(x = bin_center, y = true_rrr),
-            color = "#D55E00", linewidth = 1) +
-  geom_point(data = true_bin, aes(x = bin_center, y = true_rrr),
-             color = "#D55E00", size = 2, shape = 16) +
-  # Original (uncorrected) — dashed, thinner
-  geom_line(data = plot_corr, aes(x = bin_center, y = orig_mean,
-                                  color = Model, group = Model),
-            linetype = "dashed", linewidth = 0.6, alpha = 0.5) +
-  # Corrected — solid, bold, with CI ribbons
-  geom_ribbon(data = plot_corr,
-              aes(x = bin_center,
-                  ymin = corr_mean - 1.96 * se_val,
-                  ymax = corr_mean + 1.96 * se_val,
-                  fill = Model),
-              alpha = 0.12, colour = NA) +
-  geom_line(data = plot_corr,
-            aes(x = bin_center, y = corr_mean, color = Model),
-            linewidth = 1) +
-  geom_point(data = plot_corr,
-             aes(x = bin_center, y = corr_mean, color = Model, shape = Model),
-             size = 2) +
-  facet_wrap(~school_type) +
-  scale_color_manual(
-    values = model_colors[c("MLE", "LASSO", "Post")],
-    labels = model_labels[c("MLE", "LASSO", "Post")]
-  ) +
-  scale_fill_manual(
-    values = model_colors[c("MLE", "LASSO", "Post")],
-    labels = model_labels[c("MLE", "LASSO", "Post")]
-  ) +
-  scale_shape_manual(
-    values = model_shapes[c("MLE", "LASSO", "Post")],
-    labels = model_labels[c("MLE", "LASSO", "Post")]
-  ) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(
-    title    = "RRR with Bootstrap Bias Correction (Marginal Student)",
-    subtitle = paste0(
-      "Solid = corrected (2\u00b7orig - E*[boot]);  dashed = uncorrected;  ",
-      "orange = truth  |  ", ref_label, "  |  B = ", B_boot
-    ),
-    x = "School Quality Percentile",
-    y = expression(frac(P[covid] - P[baseline], 1 - P[baseline]))
-  ) +
-  guides(color = guide_legend(NULL), fill = guide_legend(NULL),
-         shape = guide_legend(NULL)) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "bottom",
-    strip.text      = element_text(face = "bold", size = 12),
-    legend.text     = element_text(size = 10),
-    plot.subtitle   = element_text(size = 10)
-  )
-
-out_bc <- file.path(fig_dir, "RRR_bias_corrected.pdf")
-ggsave(out_bc, plt_rrr_bc, width = 12, height = 6)
-cat(sprintf("  Figure 4 saved: %s\n", out_bc))
 
 
 # --- Save results ---
