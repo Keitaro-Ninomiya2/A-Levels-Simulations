@@ -1,5 +1,7 @@
 R_libs/
-output/
 *.rds
-*.pdf
 .Rhistory
+
+# Allow figures directory but ignore other output
+output/results/
+!output/figures/

@@ -14,7 +14,7 @@ library(data.table)
 library(Matrix)
 library(glmnet)
 
-source(file.path(Sys.getenv("HOME"), "A-Levels", "R", "01_dgp.R"))
+source(file.path(Sys.getenv("HOME"), "A-Levels", "Post_LASSO", "R", "01_dgp.R"))
 
 
 # ------------------------------------------------------------------------------
@@ -43,6 +43,7 @@ build_design_matrix <- function(panel, J, cov_names) {
 
   # --- Covariates (N x p) ---
   Z <- as.matrix(panel[, ..cov_names])
+  Z <- scale(Z, center = TRUE, scale = FALSE)  # mean-zero columns
   Z_sp <- as(Z, "dgCMatrix")
 
   # --- COVID x Covariates (N x p) ---
@@ -70,29 +71,41 @@ build_design_matrix <- function(panel, J, cov_names) {
 # ------------------------------------------------------------------------------
 # 2. FIT UNPENALIZED LOGIT
 # ------------------------------------------------------------------------------
-fit_unpenalized <- function(X, y) {
+fit_unpenalized <- function(X, y, tol = 1e-8, maxit = 50L) {
+  # Sparse IRLS (iteratively reweighted least squares) for logistic MLE
+  # No penalty — true maximum likelihood
+  N <- nrow(X)
   P <- ncol(X)
-  # Descending lambda path for warm-start convergence to MLE
-  lambda_seq <- 10^seq(-1, -6, length.out = 30)
+  beta <- rep(0, P)
 
-  gfit <- glmnet(
-    x           = X,
-    y           = y,
-    family      = "binomial",
-    alpha       = 0,
-    lambda      = lambda_seq,
-    intercept   = FALSE,
-    standardize = FALSE,
-    thresh      = 1e-7,
-    maxit       = 1e5
-  )
+  for (iter in seq_len(maxit)) {
+    eta <- as.numeric(X %*% beta)
+    mu  <- plogis(eta)
+    w   <- mu * (1 - mu)
+    w   <- pmax(w, 1e-10)
 
-  s_use  <- min(gfit$lambda)
-  cf     <- coef(gfit, s = s_use)
-  coefs  <- as.numeric(cf)[-1]
-  fitted <- plogis(as.numeric(X %*% coefs))
+    # Working response
+    z <- eta + (y - mu) / w
 
-  list(coefs = coefs, fitted = fitted)
+    # Weighted normal equations: (X'WX) beta = X'Wz
+    # Use sparse Cholesky for efficiency
+    sqW  <- sqrt(w)
+    XtWX <- crossprod(X * sqW)
+    diag(XtWX) <- diag(XtWX) + 1e-10  # numerical stability
+    XtWz <- as.numeric(crossprod(X, w * z))
+
+    beta_new <- as.numeric(solve(XtWX, XtWz))
+
+    # Check convergence
+    if (max(abs(beta_new - beta)) < tol) {
+      beta <- beta_new
+      break
+    }
+    beta <- beta_new
+  }
+
+  fitted <- plogis(as.numeric(X %*% beta))
+  list(coefs = beta, fitted = fitted)
 }
 
 
@@ -275,9 +288,14 @@ estimate_all <- function(panel, school_dt, params) {
   # Check which of these have non-zero coefs in LASSO
   selected_flags  <- res_pen$coefs[all_cov_indices] != 0
   
-  # Indices to keep: All School Cols (1:2J) + Selected Covariates
-  # We subset columns from X
-  keep_cols <- c(1:(2*J), all_cov_indices[selected_flags])
+  # Mandatory: first 4 base covariates + their COVID interactions
+  mandatory_base_idx <- ci$eta_cols[1:4]
+  mandatory_covid_idx <- ci$delta_eta_cols[1:4]
+  mandatory_indices <- c(mandatory_base_idx, mandatory_covid_idx)
+
+  # Union of LASSO-selected and mandatory
+  keep_cols <- unique(c(1:(2*J), all_cov_indices[selected_flags], mandatory_indices))
+  keep_cols <- sort(keep_cols)
   X_post    <- X[, keep_cols, drop = FALSE]
   
   # Re-run Unpenalized on this subset

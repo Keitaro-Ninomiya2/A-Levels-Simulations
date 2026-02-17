@@ -6,8 +6,8 @@ library(parallel)
 library(data.table)
 
 # Source components
-source(file.path(Sys.getenv("HOME"), "A-Levels", "R", "01_dgp.R"))
-source(file.path(Sys.getenv("HOME"), "A-Levels", "R", "02_estimator.R"))
+source(file.path(Sys.getenv("HOME"), "A-Levels", "Post_LASSO", "R", "01_dgp.R"))
+source(file.path(Sys.getenv("HOME"), "A-Levels", "Post_LASSO", "R", "02_estimator.R"))
 
 params  <- default_params()
 OUT_DIR <- file.path(Sys.getenv("HOME"), "A-Levels", "output", "results")
@@ -15,7 +15,7 @@ dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
 # --- CONFIGURATION ---
 N_REPS  <- 5
-N_CORES <- 5  # One core per rep for maximum speed
+N_CORES <- 2  # Limited to avoid OOM with dense IRLS solves
 
 cat(sprintf("Starting Monte Carlo Simulation\nCores: %d | Total Reps: %d\n", N_CORES, N_REPS))
 

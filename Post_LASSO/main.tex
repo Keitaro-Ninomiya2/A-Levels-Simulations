@@ -1,0 +1,42 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\begin{document}
+
+\title{Simulation Log: February 13, 2026}
+\author{Project: A-Level COVID Grade Inflation Analysis}
+\date{}
+\maketitle
+
+\section{Executive Summary}
+The primary objective of today's session was to implement and validate a \textbf{Double-Selection Post-LASSO} estimator to correct for shrinkage bias observed in standard penalized logistic regressions. We successfully transitioned the simulation to a parallelized, memory-stable environment on the campus cluster.
+
+\section{Accomplishments}
+
+\begin{itemize}
+    \item \textbf{Post-LASSO Integration}: Modified \texttt{02\_estimator.R} to include a three-stage pipeline: Unpenalized, LASSO, and Post-LASSO.
+    \item \textbf{Computational Efficiency}: Optimized \texttt{03\_simulation\_runner.R} using \texttt{mclapply}. Execution time per replication was reduced from $\approx 240$ seconds to $\approx 80$ seconds.
+    \item \textbf{Cluster Memory Management}: Resolved \texttt{OOM (Out of Memory)} crashes by limiting concurrent processes to $N_{cores}=5$. Implemented a per-replication save strategy (\texttt{rep\_001.rds}) to prevent data loss.
+    \item \textbf{Robust Data Synthesis}: Developed a ``Universal Loader'' in \texttt{04\_analysis.R} that merges individual results with the master \texttt{school\_structure.rds}.
+\end{itemize}
+
+\section{Current Empirical Findings}
+Initial Monte Carlo results (5 replications, $N=20,000$) indicated significant model-specification issues:
+\begin{itemize}
+    \item \textbf{Shrinkage Bias}: The LASSO estimates exhibit a ``flat-line'' effect, failing to track the quality-inflation gradient.
+    \item \textbf{Reference Student Shift}: A vertical intercept gap exists between the ``True'' and ``Estimated'' lines, likely due to uncentered covariates shifting the intercept interpretation.
+\end{itemize}
+
+\section{Sunday Action Plan}
+\begin{enumerate}
+    \item \textbf{Zero-Lambda Enforcement}: Update \texttt{fit\_unpenalized} to terminate at $\lambda=0$ for true MLE.
+    \item \textbf{Covariate Protection}: Hard-code the inclusion of essential controls in the second stage.
+    \item \textbf{Scaling}: Return to the full DGP sample size ($N \approx 200,000$ per year) once the pilot is unbiased.
+\end{enumerate}
+
+\end{document}
