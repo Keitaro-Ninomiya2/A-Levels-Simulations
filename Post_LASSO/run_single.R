@@ -580,7 +580,7 @@ results <- data.table(
 # Instead of the average student (Z=0), use a weaker student so that
 # (1 - p_baseline) >= 0.20 for >95% of schools, eliminating the unstable
 # denominator in RRR.  GCSE at -1.0 centered (≈ 1 SD below mean).
-GCSE_REF <- -1.0
+GCSE_REF <- -2.0
 Z_ref    <- rep(0, p)
 Z_ref[1] <- GCSE_REF
 REF_SHIFT       <- drop(Z_ref %*% fit_A$gamma_b)   # baseline log-odds shift
