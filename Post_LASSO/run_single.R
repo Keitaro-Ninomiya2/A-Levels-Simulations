@@ -937,6 +937,182 @@ cat(sprintf("  (1-p0) >= 0.15 for %.0f%% of schools\n\n",
 
 
 # ==============================================================================
+# 6c. SECTOR-SPECIFIC PLATT SCALING (SCALE CALIBRATION)
+# ==============================================================================
+# The global model may be "over-confident" for sectors with compressed grade
+# distributions (e.g. Independent). Platt scaling fits:
+#   logit(P(Y=1)) = delta_sector + k_sector * Z_raw
+# within each sector, where k < 1 flattens the logistic curve.
+#
+# We then use bin-specific reference profiles (mean covariates per quality bin)
+# to compute calibrated RRR at each point along the quality spectrum.
+# ==============================================================================
+
+cat("[7] Platt scaling calibration...\n")
+
+# --- Step 1: Raw linear predictors for all students ---
+# Model A (MLE)
+Z_raw_A <- fit_A$alpha[sid] + fit_A$delta[sid] * d_covid +
+           drop(Z_base %*% fit_A$gamma_b) +
+           d_covid * drop(Z_base %*% fit_A$gamma_c)
+
+# Model C (Post-LASSO) — uses subset of covariates
+Z_post_base_part  <- drop(Z_base[, keep_base, drop = FALSE] %*%
+                          fit_C$gamma_b[1:p_post_b])
+Z_post_covid_part <- drop(Z_base[, keep_covid, drop = FALSE] %*%
+                          fit_C$gamma_b[(p_post_b + 1):(p_post_b + p_post_c)])
+Z_raw_C <- fit_C$alpha[sid] + fit_C$delta[sid] * d_covid +
+           Z_post_base_part + d_covid * Z_post_covid_part
+rm(Z_post_base_part, Z_post_covid_part)
+
+# --- Step 2: Fit Platt scaling per sector ---
+student_type <- school_dt$school_type[sid]
+platt_A <- list()
+platt_C <- list()
+
+for (stype in c("State", "Academy", "Independent")) {
+  mask <- which(student_type == stype)
+
+  # MLE
+  pfit_A <- glm(y[mask] ~ Z_raw_A[mask], family = binomial)
+  platt_A[[stype]] <- coef(pfit_A)  # [1] = delta, [2] = k
+
+  # Post-LASSO
+  pfit_C <- glm(y[mask] ~ Z_raw_C[mask], family = binomial)
+  platt_C[[stype]] <- coef(pfit_C)
+}
+
+cat("  Platt scale factors (k_sector):\n")
+cat(sprintf("    MLE:        State=%.4f, Academy=%.4f, Independent=%.4f\n",
+            platt_A[["State"]][2], platt_A[["Academy"]][2], platt_A[["Independent"]][2]))
+cat(sprintf("    Post-LASSO: State=%.4f, Academy=%.4f, Independent=%.4f\n",
+            platt_C[["State"]][2], platt_C[["Academy"]][2], platt_C[["Independent"]][2]))
+cat("  Platt intercepts (delta_sector):\n")
+cat(sprintf("    MLE:        State=%.4f, Academy=%.4f, Independent=%.4f\n",
+            platt_A[["State"]][1], platt_A[["Academy"]][1], platt_A[["Independent"]][1]))
+cat(sprintf("    Post-LASSO: State=%.4f, Academy=%.4f, Independent=%.4f\n",
+            platt_C[["State"]][1], platt_C[["Academy"]][1], platt_C[["Independent"]][1]))
+
+rm(Z_raw_A, Z_raw_C)
+gc(verbose = FALSE)
+
+# --- Step 3: Bin-specific reference profiles ---
+# Map students to bins via their school's quality percentile bin
+student_bin <- results$bin[match(sid, results$school_id)]
+
+# Compute mean covariate profile per bin (centered scale)
+n_bins <- 20L
+bin_profiles_centered <- vector("list", n_bins)
+bin_profiles_raw      <- vector("list", n_bins)
+for (b in seq_len(n_bins)) {
+  mask <- which(student_bin == b)
+  if (length(mask) > 0) {
+    bin_profiles_centered[[b]] <- colMeans(Z_base[mask, , drop = FALSE])
+    bin_profiles_raw[[b]]      <- bin_profiles_centered[[b]] + col_means
+  }
+}
+
+cat(sprintf("\n  Bin profiles computed: %d / %d bins populated\n",
+            sum(!sapply(bin_profiles_centered, is.null)), n_bins))
+
+# --- Step 4: Calibrated predictions per school ---
+# For each school j: use its bin's mean profile + its own alpha_hat,
+# then apply its sector's Platt calibration.
+
+cal_mle_p0  <- numeric(J)
+cal_mle_p1  <- numeric(J)
+cal_post_p0 <- numeric(J)
+cal_post_p1 <- numeric(J)
+cal_true_p0 <- numeric(J)
+cal_true_p1 <- numeric(J)
+
+for (j in seq_len(J)) {
+  b     <- results$bin[j]
+  stype <- as.character(results$school_type[j])
+
+  if (is.null(bin_profiles_centered[[b]])) next
+
+  prof_c <- bin_profiles_centered[[b]]
+  prof_r <- bin_profiles_raw[[b]]
+
+  # --- MLE raw linear predictors ---
+  z_base_A  <- eb_alpha_A[j] + drop(prof_c %*% fit_A$gamma_b)
+  z_covid_A <- eb_alpha_A[j] + eb_delta_A[j] +
+               drop(prof_c %*% (fit_A$gamma_b + fit_A$gamma_c))
+
+  # Apply Platt calibration
+  pa <- platt_A[[stype]]
+  cal_mle_p0[j]  <- plogis(pa[1] + pa[2] * z_base_A)
+  cal_mle_p1[j]  <- plogis(pa[1] + pa[2] * z_covid_A)
+
+  # --- Post-LASSO raw linear predictors ---
+  prof_c_base  <- prof_c[keep_base]
+  prof_c_covid <- prof_c[keep_covid]
+  z_base_C  <- eb_alpha_C[j] +
+               drop(prof_c_base %*% fit_C$gamma_b[1:p_post_b])
+  z_covid_C <- eb_alpha_C[j] + eb_delta_C[j] +
+               drop(prof_c_base %*% fit_C$gamma_b[1:p_post_b]) +
+               drop(prof_c_covid %*% fit_C$gamma_b[(p_post_b + 1):(p_post_b + p_post_c)])
+
+  # Apply Platt calibration
+  pc <- platt_C[[stype]]
+  cal_post_p0[j] <- plogis(pc[1] + pc[2] * z_base_C)
+  cal_post_p1[j] <- plogis(pc[1] + pc[2] * z_covid_C)
+
+  # --- Truth (no calibration needed) ---
+  true_base_s  <- params$eta["GCSE_std"] * prof_r[1] +
+                  params$eta["SES"]      * prof_r[2] +
+                  params$eta["Minority"] * prof_r[3] +
+                  params$eta["Gender"]   * prof_r[4]
+  true_covid_s <- (params$eta["GCSE_std"] + params$delta_eta["GCSE_std"]) * prof_r[1] +
+                  (params$eta["SES"]      + params$delta_eta["SES"])      * prof_r[2] +
+                  (params$eta["Minority"] + params$delta_eta["Minority"]) * prof_r[3] +
+                  (params$eta["Gender"]   + params$delta_eta["Gender"])   * prof_r[4] +
+                  school_dt$beta_ses_j[j] * prof_r[2] +
+                  school_dt$beta_min_j[j] * prof_r[3]
+
+  cal_true_p0[j] <- plogis(school_dt$alpha_j[j] + true_base_s)
+  cal_true_p1[j] <- plogis(school_dt$alpha_j[j] + school_dt$delta_alpha_j[j] + true_covid_s)
+}
+
+# Store in results
+results[, cal_true_p0  := cal_true_p0]
+results[, cal_true_p1  := cal_true_p1]
+results[, cal_true_raw := cal_true_p1 - cal_true_p0]
+results[, cal_true_rrr := cal_true_raw / (1 - cal_true_p0)]
+
+results[, cal_mle_p0  := cal_mle_p0]
+results[, cal_mle_p1  := cal_mle_p1]
+results[, cal_mle_raw := cal_mle_p1 - cal_mle_p0]
+results[, cal_mle_rrr := cal_mle_raw / (1 - cal_mle_p0)]
+
+results[, cal_post_p0  := cal_post_p0]
+results[, cal_post_p1  := cal_post_p1]
+results[, cal_post_raw := cal_post_p1 - cal_post_p0]
+results[, cal_post_rrr := cal_post_raw / (1 - cal_post_p0)]
+
+# --- Summary ---
+cat("\nPlatt-calibrated RRR by school type:\n")
+cal_summ <- results[, .(
+  True_RRR = round(mean(cal_true_rrr), 4),
+  MLE_RRR  = round(mean(cal_mle_rrr), 4),
+  Post_RRR = round(mean(cal_post_rrr), 4),
+  max_p0_true = round(max(cal_true_p0), 3),
+  max_p0_mle  = round(max(cal_mle_p0), 3)
+), by = school_type]
+print(cal_summ)
+
+cat("\nPlatt-calibrated denominator bias:\n")
+for (stype in c("State", "Academy", "Independent")) {
+  mask <- results$school_type == stype
+  db_mle  <- mean((1 - results$cal_mle_p0[mask])  - (1 - results$cal_true_p0[mask]))
+  db_post <- mean((1 - results$cal_post_p0[mask]) - (1 - results$cal_true_p0[mask]))
+  cat(sprintf("  %s: MLE %.5f, Post-LASSO %.5f\n", stype, db_mle, db_post))
+}
+cat("\n")
+
+
+# ==============================================================================
 # 7. PLOTS
 # ==============================================================================
 cat("[6] Generating plots...\n")
@@ -1120,6 +1296,67 @@ plt_sec <- ggplot(plot_sec, aes(x = bin_center, y = mean_val,
 out_sec <- file.path(fig_dir, "RRR_sector_specific.pdf")
 ggsave(out_sec, plt_sec, width = 12, height = 6)
 cat(sprintf("  Figure 3 saved: %s\n", out_sec))
+
+
+# --- FIGURE 4: RRR (Platt-Scaled Calibration + Bin Profiles) ---
+long_cal <- melt(
+  results,
+  id.vars      = c("bin_center", "school_type"),
+  measure.vars = c("cal_true_rrr", "cal_mle_rrr", "cal_post_rrr"),
+  variable.name = "Model",
+  value.name    = "rrr"
+)
+long_cal[, Model := factor(
+  sub("^cal_", "", sub("_rrr$", "", Model)),
+  levels = c("true", "mle", "post"),
+  labels = c("True", "MLE", "Post")
+)]
+plot_cal <- agg_with_se(long_cal, "rrr")
+
+cal_colors <- model_colors[c("True", "MLE", "Post")]
+cal_labels <- model_labels[c("True", "MLE", "Post")]
+cal_shapes <- model_shapes[c("True", "MLE", "Post")]
+
+k_label <- sprintf("k: State=%.3f, Acad=%.3f, Indep=%.3f",
+                    platt_A[["State"]][2], platt_A[["Academy"]][2],
+                    platt_A[["Independent"]][2])
+
+plt_cal <- ggplot(plot_cal, aes(x = bin_center, y = mean_val,
+                                color = Model, shape = Model)) +
+  geom_ribbon(aes(ymin = mean_val - 1.96 * se_val,
+                  ymax = mean_val + 1.96 * se_val,
+                  fill = Model), alpha = 0.12, colour = NA) +
+  geom_line(aes(linetype = Model), linewidth = 0.9,
+            position = position_dodge(width = 0.01)) +
+  geom_point(size = 2, position = position_dodge(width = 0.01)) +
+  facet_wrap(~school_type) +
+  scale_color_manual(values = cal_colors, labels = cal_labels) +
+  scale_fill_manual(values = cal_colors, labels = cal_labels) +
+  scale_shape_manual(values = cal_shapes, labels = cal_labels) +
+  scale_linetype_manual(
+    values = c(True = "solid", MLE = "dashed", Post = "solid"),
+    labels = cal_labels
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title    = "RRR with Platt-Scaled Calibration (Bin-Specific Profiles)",
+    subtitle = paste0("logit(P) = delta_s + k_s * Z_raw  |  ", k_label),
+    x = "School Quality Percentile",
+    y = expression(frac(P[covid] - P[baseline], 1 - P[baseline]))
+  ) +
+  guides(color = guide_legend(NULL), fill = guide_legend(NULL),
+         shape = guide_legend(NULL), linetype = guide_legend(NULL)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text      = element_text(face = "bold", size = 12),
+    legend.text     = element_text(size = 10),
+    plot.subtitle   = element_text(size = 10)
+  )
+
+out_cal <- file.path(fig_dir, "RRR_scaled_calibration.pdf")
+ggsave(out_cal, plt_cal, width = 12, height = 6)
+cat(sprintf("  Figure 4 saved: %s\n", out_cal))
 
 
 # --- Save results ---
