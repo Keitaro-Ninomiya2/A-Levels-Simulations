@@ -638,14 +638,24 @@ cat("Generating plots...\n")
 fig_dir <- file.path(Sys.getenv("HOME"), "A-Levels", "output", "figures")
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 
-model_colors <- c(True  = "#D55E00",
-                  MLE   = "grey50",
-                  LASSO = "black",
-                  Post  = "#0072B2")
+# Distinct, high-contrast colours — no grey
+model_colors <- c(True  = "#D55E00",   # vermillion
+                  MLE   = "#009E73",   # green
+                  LASSO = "#000000",   # black
+                  Post  = "#0072B2")   # blue
 model_labels <- c(True  = "True (DGP)",
                   MLE   = "Unpenalized MLE + EB",
                   LASSO = "Penalized MLE (LASSO) + EB",
                   Post  = "Post-LASSO + EB")
+model_shapes <- c(True = 16, MLE = 17, LASSO = 15, Post = 18)  # circle, triangle, square, diamond
+
+# Helper: aggregate with mean + SE for error bars
+agg_with_se <- function(dt, value_col) {
+  dt[, .(mean_val = mean(get(value_col), na.rm = TRUE),
+         se_val   = sd(get(value_col), na.rm = TRUE) / sqrt(.N)),
+     by = .(bin_center, school_type, Model)]
+}
+
 
 # --- FIGURE 1: Raw Probability Increase (p1 - p0) ---
 long_raw <- melt(
@@ -661,15 +671,20 @@ long_raw[, Model := factor(
   labels = c("True", "MLE", "LASSO", "Post")
 )]
 
-plot_raw <- long_raw[, .(mean_val = mean(prob_increase, na.rm = TRUE)),
-                     by = .(bin_center, school_type, Model)]
+plot_raw <- agg_with_se(long_raw, "prob_increase")
 
 plt_prob <- ggplot(plot_raw, aes(x = bin_center, y = mean_val,
-                                color = Model, linetype = Model)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 1.5) +
+                                color = Model, shape = Model)) +
+  geom_ribbon(aes(ymin = mean_val - 1.96 * se_val,
+                  ymax = mean_val + 1.96 * se_val,
+                  fill = Model), alpha = 0.12, colour = NA) +
+  geom_line(aes(linetype = Model), linewidth = 0.9,
+            position = position_dodge(width = 0.01)) +
+  geom_point(size = 2, position = position_dodge(width = 0.01)) +
   facet_wrap(~school_type) +
   scale_color_manual(values = model_colors, labels = model_labels) +
+  scale_fill_manual(values = model_colors, labels = model_labels) +
+  scale_shape_manual(values = model_shapes, labels = model_labels) +
   scale_linetype_manual(
     values = c(True = "solid", MLE = "dashed", LASSO = "dotdash", Post = "solid"),
     labels = model_labels
@@ -678,13 +693,13 @@ plt_prob <- ggplot(plot_raw, aes(x = bin_center, y = mean_val,
     title    = "COVID Grade Inflation: Raw Probability Increase",
     subtitle = expression(
       "Inflation = " * P[covid] - P[baseline] *
-      "  (reference student, EB-shrunk school effects)"
+      "  (reference student, EB-shrunk school effects; shaded = 95% CI of bin mean)"
     ),
-    x     = "School Quality Percentile",
-    y     = expression(P[covid] - P[baseline]),
-    color    = NULL,
-    linetype = NULL
+    x = "School Quality Percentile",
+    y = expression(P[covid] - P[baseline])
   ) +
+  guides(color = guide_legend(NULL), fill = guide_legend(NULL),
+         shape = guide_legend(NULL), linetype = guide_legend(NULL)) +
   theme_minimal(base_size = 12) +
   theme(
     legend.position  = "bottom",
@@ -712,15 +727,20 @@ long_rrr[, Model := factor(
   labels = c("True", "MLE", "LASSO", "Post")
 )]
 
-plot_rrr <- long_rrr[, .(mean_val = mean(rrr, na.rm = TRUE)),
-                     by = .(bin_center, school_type, Model)]
+plot_rrr <- agg_with_se(long_rrr, "rrr")
 
 plt_rrr <- ggplot(plot_rrr, aes(x = bin_center, y = mean_val,
-                                color = Model, linetype = Model)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 1.5) +
+                                color = Model, shape = Model)) +
+  geom_ribbon(aes(ymin = mean_val - 1.96 * se_val,
+                  ymax = mean_val + 1.96 * se_val,
+                  fill = Model), alpha = 0.12, colour = NA) +
+  geom_line(aes(linetype = Model), linewidth = 0.9,
+            position = position_dodge(width = 0.01)) +
+  geom_point(size = 2, position = position_dodge(width = 0.01)) +
   facet_wrap(~school_type) +
   scale_color_manual(values = model_colors, labels = model_labels) +
+  scale_fill_manual(values = model_colors, labels = model_labels) +
+  scale_shape_manual(values = model_shapes, labels = model_labels) +
   scale_linetype_manual(
     values = c(True = "solid", MLE = "dashed", LASSO = "dotdash", Post = "solid"),
     labels = model_labels
@@ -729,14 +749,14 @@ plt_rrr <- ggplot(plot_rrr, aes(x = bin_center, y = mean_val,
     title    = "COVID Grade Inflation: Relative Risk Reduction",
     subtitle = expression(
       "RRR = " * frac(P[covid] - P[baseline], 1 - P[baseline]) *
-      "  (fraction of 'room to inflate' consumed)"
+      "  (fraction of 'room to inflate' consumed; shaded = 95% CI of bin mean)"
     ),
-    x     = "School Quality Percentile",
-    y     = expression(frac(P[covid] - P[baseline], 1 - P[baseline])),
-    color    = NULL,
-    linetype = NULL
+    x = "School Quality Percentile",
+    y = expression(frac(P[covid] - P[baseline], 1 - P[baseline]))
   ) +
   scale_y_continuous(labels = scales::percent_format()) +
+  guides(color = guide_legend(NULL), fill = guide_legend(NULL),
+         shape = guide_legend(NULL), linetype = guide_legend(NULL)) +
   theme_minimal(base_size = 12) +
   theme(
     legend.position  = "bottom",
