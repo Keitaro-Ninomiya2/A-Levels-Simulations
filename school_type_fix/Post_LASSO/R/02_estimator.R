@@ -556,52 +556,41 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
   stypes <- as.character(school_dt$school_type)
   student_type <- school_dt$school_type[sid]
 
-  # --- Sector-specific reference profiles ---
-  sector_ref_raw      <- list()
-  sector_ref_centered <- list()
-  for (stype in c("State", "Academy", "Independent")) {
-    mask <- which(student_type == stype)
-    centered_mean <- colMeans(Z_base[mask, , drop = FALSE])
-    raw_mean      <- centered_mean + col_means
-    sector_ref_raw[[stype]]      <- raw_mean
-    sector_ref_centered[[stype]] <- centered_mean
-  }
+  # --- Global reference student (fixed across all school types) ---
+  # Uses the overall sample mean to remove composition differences.
+  # Type-specific slopes (truth + LASSO estimates) still vary by school type.
+  ref_raw      <- col_means                        # global mean on raw scale
+  ref_centered <- rep(0, p)                        # zero on centered scale
 
   # --- Clamping: reduce GCSE if max p_base > 0.85 ---
+  # Use the most generous slopes (Independent) for worst-case clamping
   P_BASE_CAP <- 0.85
-  for (stype in c("State", "Academy", "Independent")) {
-    s_ids <- which(stypes == stype)
-    s_raw <- sector_ref_raw[[stype]]
-    et    <- params$eta_type[[stype]]
+  alpha_max_all <- max(school_dt$alpha_j)
+  worst_et <- params$eta_type[["Independent"]]
+  non_gcse_shift <- worst_et["SES"]      * ref_raw[2] +
+                    worst_et["Minority"] * ref_raw[3] +
+                    worst_et["Gender"]   * ref_raw[4]
+  max_p <- plogis(alpha_max_all + params$eta_GCSE * ref_raw[1] + non_gcse_shift)
 
-    non_gcse_shift <- et["SES"]      * s_raw[2] +
-                      et["Minority"] * s_raw[3] +
-                      et["Gender"]   * s_raw[4]
-    s_alpha_max <- max(school_dt$alpha_j[s_ids])
-    s_max_p <- plogis(s_alpha_max + params$eta_GCSE * s_raw[1] + non_gcse_shift)
-
-    if (s_max_p > P_BASE_CAP) {
-      clamp_fn <- function(z) {
-        plogis(s_alpha_max + params$eta_GCSE * z + non_gcse_shift) - P_BASE_CAP
-      }
-      gcse_clamp <- uniroot(clamp_fn, interval = c(-5, s_raw[1]), tol = 1e-8)$root
-      s_raw_new    <- s_raw
-      s_raw_new[1] <- gcse_clamp
-      s_raw_new[5] <- gcse_clamp^2
-      s_raw_new[6] <- gcse_clamp * s_raw[2]
-      s_raw_new[7] <- gcse_clamp * s_raw[3]
-      s_raw_new[8] <- gcse_clamp * s_raw[4]
-      sector_ref_raw[[stype]]      <- s_raw_new
-      sector_ref_centered[[stype]] <- s_raw_new - col_means
+  if (max_p > P_BASE_CAP) {
+    clamp_fn <- function(z) {
+      plogis(alpha_max_all + params$eta_GCSE * z + non_gcse_shift) - P_BASE_CAP
     }
+    gcse_clamp <- uniroot(clamp_fn, interval = c(-5, ref_raw[1]), tol = 1e-8)$root
+    ref_raw[1] <- gcse_clamp
+    ref_raw[5] <- gcse_clamp^2
+    ref_raw[6] <- gcse_clamp * ref_raw[2]
+    ref_raw[7] <- gcse_clamp * ref_raw[3]
+    ref_raw[8] <- gcse_clamp * ref_raw[4]
+    ref_centered <- ref_raw - col_means
   }
 
-  # --- Truth: type-specific slopes + school-specific COVID biases ---
+  # --- Truth: type-specific slopes applied to FIXED student ---
   true_base  <- numeric(J)
   true_covid <- numeric(J)
+  r <- ref_raw
   for (stype in c("State", "Academy", "Independent")) {
     idx <- which(stypes == stype)
-    r   <- sector_ref_raw[[stype]]
     et  <- params$eta_type[[stype]]
 
     base_s <- params$eta_GCSE * r[1] +
@@ -620,28 +609,22 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     true_covid[idx] <- covid_s
   }
 
-  # --- Estimator A (Global): uses common gamma, same profile for all types ---
-  A_base  <- numeric(J)
-  A_covid <- numeric(J)
-  for (stype in c("State", "Academy", "Independent")) {
-    idx <- which(stypes == stype)
-    rc  <- sector_ref_centered[[stype]]
-    A_base[idx]  <- drop(rc %*% res_A$fit$gamma_b)
-    A_covid[idx] <- drop(rc %*% (res_A$fit$gamma_b + res_A$fit$gamma_c))
-  }
+  # --- Estimator A (Global): common gamma, fixed student ---
+  rc <- ref_centered
+  A_base  <- rep(drop(rc %*% res_A$fit$gamma_b), J)
+  A_covid <- rep(drop(rc %*% (res_A$fit$gamma_b + res_A$fit$gamma_c)), J)
 
-  # --- Estimator B (Split): each type uses its own model's gamma ---
+  # --- Estimator B (Split): type-specific gamma, fixed student ---
   B_base  <- numeric(J)
   B_covid <- numeric(J)
   for (stype in c("State", "Academy", "Independent")) {
     idx  <- which(stypes == stype)
-    rc   <- sector_ref_centered[[stype]]
     f    <- res_B$fits[[stype]]$fit
     B_base[idx]  <- drop(rc %*% f$gamma_b)
     B_covid[idx] <- drop(rc %*% (f$gamma_b + f$gamma_c))
   }
 
-  # --- Estimator C (Fix): augmented Z_post with type interactions ---
+  # --- Estimator C (Fix): fixed student, type interactions from LASSO ---
   C_base  <- numeric(J)
   C_covid <- numeric(J)
   p_post         <- res_C$p_post
@@ -649,15 +632,15 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
   fit_post       <- res_C$fit_post
   for (stype in c("State", "Academy", "Independent")) {
     idx <- which(stypes == stype)
-    rc  <- sector_ref_centered[[stype]]
 
-    # Build reference profile in Z_post coordinates
+    # Build reference profile in Z_post coordinates using FIXED student
+    # but activating type interaction columns for this school type
     rc_post <- numeric(p_post)
     rc_post[1:4] <- rc[1:4]
     if (stype == "Academy") {
-      rc_post[5:7] <- rc[2:4]
+      rc_post[5:7] <- rc[2:4]       # Demo × Acad interactions
     } else if (stype == "Independent") {
-      rc_post[8:10] <- rc[2:4]
+      rc_post[8:10] <- rc[2:4]      # Demo × Indep interactions
     }
     if (length(sel_rest_zcols) > 0) {
       rc_post[11:p_post] <- rc[sel_rest_zcols]
