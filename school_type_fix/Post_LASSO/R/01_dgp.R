@@ -71,7 +71,7 @@ default_params <- function() {
     # ---- COVID inflation ----
     # Delta_alpha_j = delta_0 + delta_1 * alpha_j + nu_j
     delta_0  = 1.0,    # general upward shift (logit scale)
-    delta_1  = -0.3,   # ceiling effect: high-alpha schools inflate less
+    delta_1  = 0.3,    # incentive effect: better schools inflate more (university placement)
     sigma_nu = 0.3,    # idiosyncratic school-level noise
 
     # Aggregate covariate shift during COVID (common across types)
