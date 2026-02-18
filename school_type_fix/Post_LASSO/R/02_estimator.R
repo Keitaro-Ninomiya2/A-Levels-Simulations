@@ -1,0 +1,760 @@
+# ==============================================================================
+# 02_estimator.R — Three Estimators for Type-Specific Slopes DGP
+# ==============================================================================
+#
+# Estimator A: Global Model — common demographic slopes (misspecified)
+# Estimator B: Split by Type — separate models per school type
+# Estimator C: Proposed Fix — LASSO on Demo × Type interactions
+#
+# Uses the sparse block IRLS solver from run_single.R for efficient estimation
+# with school fixed effects.
+# ==============================================================================
+
+.libPaths(c(file.path(Sys.getenv("HOME"), "A-Levels", "R_libs"), .libPaths()))
+library(data.table)
+library(Matrix)
+library(glmnet)
+
+source(file.path(Sys.getenv("HOME"), "A-Levels", "school_type_fix",
+                 "Post_LASSO", "R", "01_dgp.R"))
+
+
+# ==============================================================================
+# 1. SPARSE BLOCK IRLS SOLVER
+# ==============================================================================
+# Exploits block-diagonal structure of X'WX for school FEs.
+# Solves via Schur complement: O(p^3 + Jp^2) instead of O((2J+2p)^3)
+#
+# Sparse d_covid optimisation: d_covid is binary (1 for COVID year only,
+# ~12.5% of rows). All COVID-weighted operations are restricted to the
+# pre-indexed COVID subset, avoiding ~87.5% redundant computation.
+
+sparse_block_irls <- function(sid, d_covid, Z_base, y,
+                              use_covid_cov = TRUE,
+                              ridge = 1e-3,
+                              tol = 1e-8, maxit = 200) {
+  N <- length(y)
+  J <- max(sid)
+  p <- if (is.null(Z_base)) 0L else ncol(Z_base)
+  has_cov <- p > 0
+
+  # Pre-index COVID rows once (binary treatment => sparse subset)
+  ci <- which(d_covid == 1L)
+  N_c <- length(ci)
+  sid_c <- sid[ci]
+  Z_c <- if (has_cov) Z_base[ci, , drop = FALSE] else NULL
+
+  # Safe rowsum for COVID subset: guarantees J-length output even if some
+  # schools have zero COVID students (fills those with 0)
+  all_schools_in_c <- (length(unique(sid_c)) == J)
+  rowsum_c <- if (all_schools_in_c) {
+    function(x, ...) drop(rowsum(x, sid_c, reorder = TRUE))
+  } else {
+    function(x, ...) {
+      raw <- rowsum(x, sid_c, reorder = TRUE)
+      out <- numeric(J)
+      out[as.integer(rownames(raw))] <- drop(raw)
+      out
+    }
+  }
+  # Matrix version (for wZ_c -> U_c)
+  rowsum_c_mat <- if (all_schools_in_c) {
+    function(x) rowsum(x, sid_c, reorder = TRUE)
+  } else {
+    function(x) {
+      raw <- rowsum(x, sid_c, reorder = TRUE)
+      out <- matrix(0, J, ncol(x))
+      out[as.integer(rownames(raw)), ] <- raw
+      out
+    }
+  }
+
+  alpha <- rep(0, J)
+  delta <- rep(0, J)
+  gamma_b <- if (has_cov) rep(0, p) else numeric(0)
+  gamma_c <- if (has_cov && use_covid_cov) rep(0, p) else numeric(0)
+
+  for (iter in seq_len(maxit)) {
+    # Linear predictor: only add delta on COVID rows
+    eta <- alpha[sid]
+    if (has_cov) eta <- eta + drop(Z_base %*% gamma_b)
+    eta[ci] <- eta[ci] + delta[sid_c]
+    if (has_cov && use_covid_cov) eta[ci] <- eta[ci] + drop(Z_c %*% gamma_c)
+
+    mu <- plogis(eta)
+    w  <- pmax(mu * (1 - mu), 1e-10)
+    z  <- eta + (y - mu) / w
+    wz <- w * z
+
+    # School-level sufficient statistics (COVID sums use subset)
+    w_j     <- drop(rowsum(w, sid, reorder = TRUE))
+    w_j_c   <- rowsum_c(w[ci])
+    f_alpha <- drop(rowsum(wz, sid, reorder = TRUE))
+    f_delta <- rowsum_c(wz[ci])
+
+    # A^{-1} (J independent 2x2 blocks with ridge)
+    w_j_r   <- w_j + ridge
+    w_j_c_r <- w_j_c + ridge
+    det_j <- pmax(w_j_r * w_j_c_r - w_j_c^2, 1e-12)
+    ai11 <- w_j_c_r / det_j
+    ai12 <- -w_j_c / det_j
+    ai22 <- w_j_r / det_j
+
+    if (has_cov) {
+      # Full-sample covariate block
+      wZ_all <- w * Z_base
+      U_b  <- rowsum(wZ_all, sid, reorder = TRUE)
+      B11  <- crossprod(Z_base, wZ_all)
+      g_b  <- drop(crossprod(Z_base, wz))
+
+      # COVID-subset covariate block (replaces d_covid * wZ over all N)
+      w_c  <- w[ci]
+      wz_c <- wz[ci]
+      wZ_c <- w_c * Z_c
+      U_c  <- rowsum_c_mat(wZ_c)
+      B12  <- crossprod(Z_c, wZ_c)
+      g_c  <- if (use_covid_cov) drop(crossprod(Z_c, wz_c)) else numeric(0)
+      rm(wZ_all, wZ_c)
+
+      if (use_covid_cov) {
+        U_full <- cbind(U_b, U_c)
+        V_full <- cbind(U_c, U_c)
+        B_full <- rbind(cbind(B11, B12), cbind(B12, B12))
+        g_full <- c(g_b, g_c)
+
+        CtAiC <- crossprod(U_full, ai11 * U_full) +
+                 crossprod(U_full, ai12 * V_full) +
+                 crossprod(V_full, ai12 * U_full) +
+                 crossprod(V_full, ai22 * V_full)
+        S <- B_full - CtAiC
+        diag(S) <- diag(S) + 1e-10
+
+        Ainv_fa <- ai11 * f_alpha + ai12 * f_delta
+        Ainv_fd <- ai12 * f_alpha + ai22 * f_delta
+        CtAif <- drop(crossprod(U_full, Ainv_fa) + crossprod(V_full, Ainv_fd))
+        gamma_full_new <- drop(solve(S, g_full - CtAif))
+        gamma_b_new <- gamma_full_new[1:p]
+        gamma_c_new <- gamma_full_new[(p + 1):(2 * p)]
+        Cg_a <- drop(U_full %*% gamma_full_new)
+        Cg_d <- drop(V_full %*% gamma_full_new)
+      } else {
+        CtAiC <- crossprod(U_b, ai11 * U_b) +
+                 crossprod(U_b, ai12 * U_c) +
+                 crossprod(U_c, ai12 * U_b) +
+                 crossprod(U_c, ai22 * U_c)
+        S <- B11 - CtAiC
+        diag(S) <- diag(S) + 1e-10
+
+        Ainv_fa <- ai11 * f_alpha + ai12 * f_delta
+        Ainv_fd <- ai12 * f_alpha + ai22 * f_delta
+        CtAif <- drop(crossprod(U_b, Ainv_fa) + crossprod(U_c, Ainv_fd))
+        gamma_b_new <- drop(solve(S, g_b - CtAif))
+        gamma_c_new <- numeric(0)
+        Cg_a <- drop(U_b %*% gamma_b_new)
+        Cg_d <- drop(U_c %*% gamma_b_new)
+      }
+
+      alpha_new <- ai11 * (f_alpha - Cg_a) + ai12 * (f_delta - Cg_d)
+      delta_new <- ai12 * (f_alpha - Cg_a) + ai22 * (f_delta - Cg_d)
+    } else {
+      alpha_new <- ai11 * f_alpha + ai12 * f_delta
+      delta_new <- ai12 * f_alpha + ai22 * f_delta
+      gamma_b_new <- numeric(0)
+      gamma_c_new <- numeric(0)
+    }
+
+    max_change <- max(abs(c(alpha_new - alpha, delta_new - delta,
+                            gamma_b_new - gamma_b, gamma_c_new - gamma_c)))
+    alpha   <- alpha_new
+    delta   <- delta_new
+    gamma_b <- gamma_b_new
+    gamma_c <- gamma_c_new
+    if (max_change < tol) break
+  }
+
+  converged <- (max_change < tol)
+  cat(sprintf("      %s in %d iters (max change: %.2e)\n",
+              if (converged) "Converged" else "WARNING: not converged",
+              iter, max_change))
+
+  list(alpha = alpha, delta = delta, gamma_b = gamma_b, gamma_c = gamma_c,
+       iter = iter, converged = converged)
+}
+
+
+# ==============================================================================
+# 2. STANDARD ERRORS (block Schur complement)
+# ==============================================================================
+# Same sparse d_covid optimisation as the solver above.
+compute_block_se <- function(sid, d_covid, Z_base, fit,
+                             use_covid_cov = TRUE, ridge = 1e-3) {
+  J <- max(sid)
+
+  # Pre-index COVID rows
+  ci    <- which(d_covid == 1L)
+  sid_c <- sid[ci]
+  Z_c   <- Z_base[ci, , drop = FALSE]
+
+  # Safe COVID-subset rowsum (handles schools with no COVID students)
+  all_schools_in_c <- (length(unique(sid_c)) == J)
+  rowsum_c <- if (all_schools_in_c) {
+    function(x) drop(rowsum(x, sid_c, reorder = TRUE))
+  } else {
+    function(x) {
+      raw <- rowsum(x, sid_c, reorder = TRUE)
+      out <- numeric(J)
+      out[as.integer(rownames(raw))] <- drop(raw)
+      out
+    }
+  }
+  rowsum_c_mat <- if (all_schools_in_c) {
+    function(x) rowsum(x, sid_c, reorder = TRUE)
+  } else {
+    function(x) {
+      raw <- rowsum(x, sid_c, reorder = TRUE)
+      out <- matrix(0, J, ncol(x))
+      out[as.integer(rownames(raw)), ] <- raw
+      out
+    }
+  }
+
+  eta <- fit$alpha[sid]
+  if (length(fit$gamma_b) > 0)
+    eta <- eta + drop(Z_base %*% fit$gamma_b)
+  eta[ci] <- eta[ci] + fit$delta[sid_c]
+  if (use_covid_cov && length(fit$gamma_c) > 0)
+    eta[ci] <- eta[ci] + drop(Z_c %*% fit$gamma_c)
+
+  mu <- plogis(eta)
+  w  <- pmax(mu * (1 - mu), 1e-10)
+
+  w_j     <- drop(rowsum(w, sid, reorder = TRUE))
+  w_j_c   <- rowsum_c(w[ci])
+  w_j_r   <- w_j + ridge
+  w_j_c_r <- w_j_c + ridge
+  det_j   <- pmax(w_j_r * w_j_c_r - w_j_c^2, 1e-12)
+  ai11 <- w_j_c_r / det_j
+  ai12 <- -w_j_c / det_j
+  ai22 <- w_j_r / det_j
+
+  p <- ncol(Z_base)
+  if (!is.null(Z_base) && p > 0) {
+    w_c  <- w[ci]
+
+    wZ_all <- w * Z_base
+    U_b  <- rowsum(wZ_all, sid, reorder = TRUE)
+    B11  <- crossprod(Z_base, wZ_all)
+    rm(wZ_all)
+
+    wZ_c <- w_c * Z_c
+    U_c  <- rowsum_c_mat(wZ_c)
+    B12  <- crossprod(Z_c, wZ_c)
+    rm(wZ_c)
+
+    if (use_covid_cov) {
+      U_full <- cbind(U_b, U_c)
+      V_full <- cbind(U_c, U_c)
+      B_full <- rbind(cbind(B11, B12), cbind(B12, B12))
+      CtAiC <- crossprod(U_full, ai11 * U_full) +
+               crossprod(U_full, ai12 * V_full) +
+               crossprod(V_full, ai12 * U_full) +
+               crossprod(V_full, ai22 * V_full)
+      S <- B_full - CtAiC
+      diag(S) <- diag(S) + 1e-10
+      Sinv <- solve(S)
+      T1 <- ai11 * U_full + ai12 * V_full
+      T2 <- ai12 * U_full + ai22 * V_full
+    } else {
+      CtAiC <- crossprod(U_b, ai11 * U_b) +
+               crossprod(U_b, ai12 * U_c) +
+               crossprod(U_c, ai12 * U_b) +
+               crossprod(U_c, ai22 * U_c)
+      S <- B11 - CtAiC
+      diag(S) <- diag(S) + 1e-10
+      Sinv <- solve(S)
+      T1 <- ai11 * U_b + ai12 * U_c
+      T2 <- ai12 * U_b + ai22 * U_c
+    }
+    var_alpha <- ai11 + rowSums((T1 %*% Sinv) * T1)
+    var_delta <- ai22 + rowSums((T2 %*% Sinv) * T2)
+  } else {
+    var_alpha <- ai11
+    var_delta <- ai22
+  }
+
+  list(se_alpha = sqrt(pmax(var_alpha, 0)),
+       se_delta = sqrt(pmax(var_delta, 0)))
+}
+
+
+# ==============================================================================
+# 3. EMPIRICAL BAYES SHRINKAGE
+# ==============================================================================
+eb_shrink <- function(est, se, verbose = FALSE) {
+  mu   <- mean(est)
+  V    <- se^2
+  tau2 <- max(0, var(est) - mean(V))
+  if (verbose)
+    cat(sprintf("      EB: var(est)=%.4f, mean(SE^2)=%.4f, tau2=%.4f\n",
+                var(est), mean(V), tau2))
+  if (tau2 < 1e-12) return(rep(mu, length(est)))
+  B  <- tau2 / (tau2 + V)
+  (1 - B) * mu + B * est
+}
+
+
+# ==============================================================================
+# 4. ESTIMATOR A: Global Model (common slopes — misspecified)
+# ==============================================================================
+fit_global <- function(sid, d_covid, Z_base, y, cov_names) {
+  cat("    [A] Global model (common slopes)...\n")
+  t0 <- proc.time()
+
+  fit <- sparse_block_irls(sid, d_covid, Z_base, y, use_covid_cov = TRUE)
+  se  <- compute_block_se(sid, d_covid, Z_base, fit,
+                          use_covid_cov = TRUE, ridge = 0)
+  eb_alpha <- eb_shrink(fit$alpha, se$se_alpha)
+  eb_delta <- eb_shrink(fit$delta, se$se_delta)
+
+  cat(sprintf("    [A] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
+  list(fit = fit, eb_alpha = eb_alpha, eb_delta = eb_delta, se = se)
+}
+
+
+# ==============================================================================
+# 5. ESTIMATOR B: Split by Type (separate models per school type)
+# ==============================================================================
+fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
+  cat("    [B] Split-by-type models...\n")
+  t0 <- proc.time()
+
+  J <- nrow(school_dt)
+  student_type <- school_dt$school_type[sid]
+
+  eb_alpha_all <- numeric(J)
+  eb_delta_all <- numeric(J)
+  fit_list     <- list()
+
+  for (stype in c("State", "Academy", "Independent")) {
+    cat(sprintf("      %s: ", stype))
+
+    # Subset
+    s_mask     <- which(student_type == stype)
+    s_orig_ids <- sort(unique(sid[s_mask]))
+    J_s        <- length(s_orig_ids)
+    id_map     <- match(sid[s_mask], s_orig_ids)
+
+    s_sid  <- id_map
+    s_dcov <- d_covid[s_mask]
+    s_y    <- y[s_mask]
+    s_Z    <- Z_base[s_mask, , drop = FALSE]
+
+    # Fit
+    fit_s <- sparse_block_irls(s_sid, s_dcov, s_Z, s_y, use_covid_cov = TRUE)
+    se_s  <- compute_block_se(s_sid, s_dcov, s_Z, fit_s,
+                              use_covid_cov = TRUE, ridge = 0)
+    eb_a <- eb_shrink(fit_s$alpha, se_s$se_alpha)
+    eb_d <- eb_shrink(fit_s$delta, se_s$se_delta)
+
+    # Map back to global school IDs
+    eb_alpha_all[s_orig_ids] <- eb_a
+    eb_delta_all[s_orig_ids] <- eb_d
+
+    fit_list[[stype]] <- list(fit = fit_s, se = se_s,
+                               eb_alpha = eb_a, eb_delta = eb_d,
+                               school_ids = s_orig_ids)
+  }
+
+  cat(sprintf("    [B] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
+  list(eb_alpha = eb_alpha_all, eb_delta = eb_delta_all, fits = fit_list)
+}
+
+
+# ==============================================================================
+# 6. ESTIMATOR C: Proposed Fix (LASSO on Demo × Type interactions)
+# ==============================================================================
+fit_typed_lasso <- function(sid, d_covid, Z_base, y, school_dt,
+                            cov_names, col_means) {
+  cat("    [C] LASSO on Demo x Type interactions...\n")
+  t0 <- proc.time()
+
+  N <- length(y)
+  J <- nrow(school_dt)
+  p <- ncol(Z_base)
+  student_type <- school_dt$school_type[sid]
+
+  # --- Build school type indicators at student level ---
+  is_acad  <- as.numeric(student_type == "Academy")
+  is_indep <- as.numeric(student_type == "Independent")
+
+  # --- Construct Demo × Type interaction columns ---
+  # SES=col2, Minority=col3, Gender=col4 in Z_base (centered)
+  demo_acad  <- Z_base[, 2:4, drop = FALSE] * is_acad
+  demo_indep <- Z_base[, 2:4, drop = FALSE] * is_indep
+  colnames(demo_acad)  <- paste0(c("SES", "Minority", "Gender"), "_Acad")
+  colnames(demo_indep) <- paste0(c("SES", "Minority", "Gender"), "_Indep")
+
+  # --- Build full design matrix for glmnet ---
+  # School FEs
+  school_sp <- sparseMatrix(i = seq_len(N), j = sid, x = 1, dims = c(N, J))
+  covid_idx <- which(d_covid == 1L)
+  covid_school_sp <- sparseMatrix(i = covid_idx, j = sid[covid_idx],
+                                  x = 1, dims = c(N, J))
+
+  # Core covariates: GCSE(1) + Demo(3) = cols 1:4
+  Z_core <- Z_base[, 1:4, drop = FALSE]
+  Z_core_covid <- d_covid * Z_core
+
+  # Type interactions (the LASSO targets)
+  Z_type_int <- cbind(demo_acad, demo_indep)
+
+  # Remaining covariates: cols 5:p (polynomials + noise)
+  Z_rest <- Z_base[, 5:p, drop = FALSE]
+  Z_rest_covid <- d_covid * Z_rest
+
+  # Combine
+  X <- cbind(
+    school_sp,           # J cols (unpenalized)
+    covid_school_sp,     # J cols (unpenalized)
+    as(Z_core, "dgCMatrix"),        # 4 cols (unpenalized): GCSE, SES, MIN, GEN
+    as(Z_core_covid, "dgCMatrix"),  # 4 cols (unpenalized): COVID × core
+    as(Z_type_int, "dgCMatrix"),    # 6 cols (PENALIZED): Demo × Acad/Indep
+    as(Z_rest, "dgCMatrix"),        # (p-4) cols (penalized): poly + noise
+    as(Z_rest_covid, "dgCMatrix")   # (p-4) cols (penalized): COVID × poly/noise
+  )
+
+  rm(school_sp, covid_school_sp, Z_core, Z_core_covid, Z_type_int,
+     Z_rest, Z_rest_covid, demo_acad, demo_indep)
+  gc(verbose = FALSE)
+
+  # --- Penalty factor ---
+  n_core   <- 4L   # GCSE, SES, MIN, GEN
+  n_type   <- 6L   # Demo × {Acad, Indep}
+  n_rest   <- p - n_core
+  pf <- c(
+    rep(0, 2L * J),     # school FEs + COVID × school FEs
+    rep(0, n_core),      # core covariates
+    rep(0, n_core),      # COVID × core covariates
+    rep(0, n_type),      # Demo × Type interactions (unpenalized — structural)
+    rep(1, n_rest),      # poly + noise base
+    rep(1, n_rest)       # COVID × poly/noise
+  )
+
+  cat(sprintf("      X: %s x %d, penalized: %d/%d cov cols\n",
+              format(N, big.mark = ","), ncol(X),
+              sum(pf > 0), length(pf) - 2L * J))
+
+  # --- LASSO fit (AIC selection — less conservative than BIC for large N) ---
+  cat("      Fitting glmnet (AIC selection)...\n")
+  glm_fit <- glmnet(
+    x = X, y = y, family = "binomial",
+    alpha = 1, penalty.factor = pf, intercept = FALSE,
+    standardize = FALSE, thresh = 1e-7, maxit = 1e5
+  )
+
+  dev_v <- deviance(glm_fit)
+  df_v  <- glm_fit$df
+  aic_v <- dev_v + 2 * df_v
+  best_idx <- which.min(aic_v)
+
+  cf    <- coef(glm_fit, s = glm_fit$lambda[best_idx])
+  coefs <- as.numeric(cf)[-1]
+
+  # --- Extract coefficients ---
+  idx_start <- 2L * J + 1L
+  gamma_core      <- coefs[idx_start:(idx_start + n_core - 1)]
+  gamma_core_cov  <- coefs[(idx_start + n_core):(idx_start + 2*n_core - 1)]
+  gamma_type      <- coefs[(idx_start + 2*n_core):(idx_start + 2*n_core + n_type - 1)]
+  gamma_rest      <- coefs[(idx_start + 2*n_core + n_type):(idx_start + 2*n_core + n_type + n_rest - 1)]
+  gamma_rest_cov  <- coefs[(idx_start + 2*n_core + n_type + n_rest):length(coefs)]
+
+  # Report which type interactions were selected
+  type_names <- c("SES_Acad", "MIN_Acad", "GEN_Acad",
+                  "SES_Indep", "MIN_Indep", "GEN_Indep")
+  selected_type <- which(gamma_type != 0)
+  cat(sprintf("      LASSO kept %d/6 type interactions: %s\n",
+              length(selected_type),
+              paste(type_names[selected_type], collapse = ", ")))
+
+  # --- Post-LASSO: refit using exact block IRLS solver ---
+  all_cov_coefs <- coefs[(2L * J + 1):length(coefs)]
+  n_total_cov   <- length(all_cov_coefs)
+  selected_cov  <- which(all_cov_coefs != 0)
+
+  # Determine which rest columns (5:p in Z_base) LASSO selected
+  rest_base_start  <- 2L * n_core + n_type + 1L
+  rest_base_end    <- 2L * n_core + n_type + n_rest
+  rest_covid_start <- rest_base_end + 1L
+  rest_covid_end   <- n_total_cov
+
+  sel_rest_base  <- intersect(selected_cov, rest_base_start:rest_base_end) - rest_base_start + 1L
+  sel_rest_covid <- intersect(selected_cov, rest_covid_start:rest_covid_end) - rest_covid_start + 1L
+  sel_rest_local <- sort(unique(c(sel_rest_base, sel_rest_covid)))
+
+  cat(sprintf("      LASSO selected %d / %d rest columns\n",
+              length(sel_rest_local), n_rest))
+
+  # Build augmented Z for block IRLS: [core(4) | type_int(6) | selected_rest]
+  type_int_mat <- cbind(
+    Z_base[, 2] * is_acad,  Z_base[, 3] * is_acad,  Z_base[, 4] * is_acad,
+    Z_base[, 2] * is_indep, Z_base[, 3] * is_indep, Z_base[, 4] * is_indep
+  )
+
+  if (length(sel_rest_local) > 0) {
+    sel_rest_zcols <- 4L + sel_rest_local
+    Z_post <- cbind(Z_base[, 1:4], type_int_mat, Z_base[, sel_rest_zcols, drop = FALSE])
+  } else {
+    Z_post <- cbind(Z_base[, 1:4], type_int_mat)
+    sel_rest_zcols <- integer(0)
+  }
+  p_post <- ncol(Z_post)
+
+  rm(X, type_int_mat)
+  gc(verbose = FALSE)
+
+  cat(sprintf("      Post-LASSO refit via block IRLS: %d covariate columns\n", p_post))
+  fit_post <- sparse_block_irls(sid, d_covid, Z_post, y, use_covid_cov = TRUE)
+
+  # SE and EB
+  se_post <- compute_block_se(sid, d_covid, Z_post, fit_post,
+                              use_covid_cov = TRUE, ridge = 0)
+  # Type-specific EB shrinkage: shrink within each school type to avoid
+  # cross-type contamination (Independent alphas >> grand mean)
+  eb_alpha <- numeric(J)
+  eb_delta <- numeric(J)
+  for (stype in c("State", "Academy", "Independent")) {
+    idx <- which(school_dt$school_type == stype)
+    eb_alpha[idx] <- eb_shrink(fit_post$alpha[idx], se_post$se_alpha[idx])
+    eb_delta[idx] <- eb_shrink(fit_post$delta[idx], se_post$se_delta[idx])
+  }
+
+  # Extract type interaction coefficients from post-LASSO
+  gamma_type_post <- fit_post$gamma_b[5:10]
+
+  cat(sprintf("    [C] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
+
+  list(
+    eb_alpha       = eb_alpha,
+    eb_delta       = eb_delta,
+    fit_post       = fit_post,
+    gamma_type     = gamma_type_post,
+    type_names     = type_names,
+    sel_rest_zcols = sel_rest_zcols,
+    p_post         = p_post,
+    se             = se_post
+  )
+}
+
+
+# ==============================================================================
+# 7. COMPUTE RRR FOR ALL ESTIMATORS
+# ==============================================================================
+compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
+                        sid, d_covid, Z_base, col_means) {
+  J <- nrow(school_dt)
+  p <- ncol(Z_base)
+  stypes <- as.character(school_dt$school_type)
+  student_type <- school_dt$school_type[sid]
+
+  # --- Sector-specific reference profiles ---
+  sector_ref_raw      <- list()
+  sector_ref_centered <- list()
+  for (stype in c("State", "Academy", "Independent")) {
+    mask <- which(student_type == stype)
+    centered_mean <- colMeans(Z_base[mask, , drop = FALSE])
+    raw_mean      <- centered_mean + col_means
+    sector_ref_raw[[stype]]      <- raw_mean
+    sector_ref_centered[[stype]] <- centered_mean
+  }
+
+  # --- Clamping: reduce GCSE if max p_base > 0.85 ---
+  P_BASE_CAP <- 0.85
+  for (stype in c("State", "Academy", "Independent")) {
+    s_ids <- which(stypes == stype)
+    s_raw <- sector_ref_raw[[stype]]
+    et    <- params$eta_type[[stype]]
+
+    non_gcse_shift <- et["SES"]      * s_raw[2] +
+                      et["Minority"] * s_raw[3] +
+                      et["Gender"]   * s_raw[4]
+    s_alpha_max <- max(school_dt$alpha_j[s_ids])
+    s_max_p <- plogis(s_alpha_max + params$eta_GCSE * s_raw[1] + non_gcse_shift)
+
+    if (s_max_p > P_BASE_CAP) {
+      clamp_fn <- function(z) {
+        plogis(s_alpha_max + params$eta_GCSE * z + non_gcse_shift) - P_BASE_CAP
+      }
+      gcse_clamp <- uniroot(clamp_fn, interval = c(-5, s_raw[1]), tol = 1e-8)$root
+      s_raw_new    <- s_raw
+      s_raw_new[1] <- gcse_clamp
+      s_raw_new[5] <- gcse_clamp^2
+      s_raw_new[6] <- gcse_clamp * s_raw[2]
+      s_raw_new[7] <- gcse_clamp * s_raw[3]
+      s_raw_new[8] <- gcse_clamp * s_raw[4]
+      sector_ref_raw[[stype]]      <- s_raw_new
+      sector_ref_centered[[stype]] <- s_raw_new - col_means
+    }
+  }
+
+  # --- Truth: type-specific slopes + school-specific COVID biases ---
+  true_base  <- numeric(J)
+  true_covid <- numeric(J)
+  for (stype in c("State", "Academy", "Independent")) {
+    idx <- which(stypes == stype)
+    r   <- sector_ref_raw[[stype]]
+    et  <- params$eta_type[[stype]]
+
+    base_s <- params$eta_GCSE * r[1] +
+              et["SES"]       * r[2] +
+              et["Minority"]  * r[3] +
+              et["Gender"]    * r[4]
+
+    covid_s <- (params$eta_GCSE     + params$delta_eta["GCSE_std"]) * r[1] +
+               (et["SES"]           + params$delta_eta["SES"])      * r[2] +
+               (et["Minority"]      + params$delta_eta["Minority"]) * r[3] +
+               (et["Gender"]        + params$delta_eta["Gender"])   * r[4] +
+               school_dt$beta_ses_j[idx] * r[2] +
+               school_dt$beta_min_j[idx] * r[3]
+
+    true_base[idx]  <- base_s
+    true_covid[idx] <- covid_s
+  }
+
+  # --- Estimator A (Global): uses common gamma, same profile for all types ---
+  A_base  <- numeric(J)
+  A_covid <- numeric(J)
+  for (stype in c("State", "Academy", "Independent")) {
+    idx <- which(stypes == stype)
+    rc  <- sector_ref_centered[[stype]]
+    A_base[idx]  <- drop(rc %*% res_A$fit$gamma_b)
+    A_covid[idx] <- drop(rc %*% (res_A$fit$gamma_b + res_A$fit$gamma_c))
+  }
+
+  # --- Estimator B (Split): each type uses its own model's gamma ---
+  B_base  <- numeric(J)
+  B_covid <- numeric(J)
+  for (stype in c("State", "Academy", "Independent")) {
+    idx  <- which(stypes == stype)
+    rc   <- sector_ref_centered[[stype]]
+    f    <- res_B$fits[[stype]]$fit
+    B_base[idx]  <- drop(rc %*% f$gamma_b)
+    B_covid[idx] <- drop(rc %*% (f$gamma_b + f$gamma_c))
+  }
+
+  # --- Estimator C (Fix): augmented Z_post with type interactions ---
+  C_base  <- numeric(J)
+  C_covid <- numeric(J)
+  p_post         <- res_C$p_post
+  sel_rest_zcols <- res_C$sel_rest_zcols
+  fit_post       <- res_C$fit_post
+  for (stype in c("State", "Academy", "Independent")) {
+    idx <- which(stypes == stype)
+    rc  <- sector_ref_centered[[stype]]
+
+    # Build reference profile in Z_post coordinates
+    rc_post <- numeric(p_post)
+    rc_post[1:4] <- rc[1:4]
+    if (stype == "Academy") {
+      rc_post[5:7] <- rc[2:4]
+    } else if (stype == "Independent") {
+      rc_post[8:10] <- rc[2:4]
+    }
+    if (length(sel_rest_zcols) > 0) {
+      rc_post[11:p_post] <- rc[sel_rest_zcols]
+    }
+
+    C_base[idx]  <- drop(rc_post %*% fit_post$gamma_b)
+    C_covid[idx] <- drop(rc_post %*% (fit_post$gamma_b + fit_post$gamma_c))
+  }
+
+  # --- Build results table ---
+  results <- data.table(
+    school_id   = school_dt$school_id,
+    school_type = school_dt$school_type,
+    true_alpha  = school_dt$alpha_j,
+    true_delta  = school_dt$delta_alpha_j,
+
+    # Truth
+    true_p0  = plogis(school_dt$alpha_j + true_base),
+    true_p1  = plogis(school_dt$alpha_j + school_dt$delta_alpha_j + true_covid),
+
+    # Estimator A (Global)
+    A_alpha = res_A$eb_alpha,
+    A_delta = res_A$eb_delta,
+    A_p0    = plogis(res_A$eb_alpha + A_base),
+    A_p1    = plogis(res_A$eb_alpha + res_A$eb_delta + A_covid),
+
+    # Estimator B (Split)
+    B_alpha = res_B$eb_alpha,
+    B_delta = res_B$eb_delta,
+    B_p0    = plogis(res_B$eb_alpha + B_base),
+    B_p1    = plogis(res_B$eb_alpha + res_B$eb_delta + B_covid),
+
+    # Estimator C (Fix)
+    C_alpha = res_C$eb_alpha,
+    C_delta = res_C$eb_delta,
+    C_p0    = plogis(res_C$eb_alpha + C_base),
+    C_p1    = plogis(res_C$eb_alpha + res_C$eb_delta + C_covid)
+  )
+
+  # Derived quantities
+  for (prefix in c("true", "A", "B", "C")) {
+    p0_col  <- paste0(prefix, "_p0")
+    p1_col  <- paste0(prefix, "_p1")
+    raw_col <- paste0(prefix, "_raw")
+    rrr_col <- paste0(prefix, "_rrr")
+    results[, (raw_col) := get(p1_col) - get(p0_col)]
+    results[, (rrr_col) := get(raw_col) / (1 - get(p0_col))]
+  }
+
+  # Binning
+  results[, alpha_pctl := frank(true_alpha) / .N]
+  results[, bin := cut(alpha_pctl, breaks = seq(0, 1, 0.05),
+                       labels = FALSE, include.lowest = TRUE)]
+  results[, bin_center := (bin - 0.5) / 20]
+
+  results[]
+}
+
+
+# ==============================================================================
+# 8. ORCHESTRATOR
+# ==============================================================================
+estimate_all <- function(panel, school_dt, params) {
+  J         <- nrow(school_dt)
+  cov_names <- get_covariate_names(params)
+  p         <- length(cov_names)
+  sid       <- panel$school_id
+  d_covid   <- panel$D_covid
+  y         <- panel$Y
+
+  # Mean-centre covariates
+  Z_base <- as.matrix(panel[, ..cov_names])
+  Z_base <- scale(Z_base, center = TRUE, scale = FALSE)
+  col_means <- attr(Z_base, "scaled:center")
+
+  rm(panel)
+  gc(verbose = FALSE)
+
+  cat(sprintf("    J = %d schools, p = %d covariates, N = %s\n",
+              J, p, format(length(y), big.mark = ",")))
+
+  # --- Estimator A: Global ---
+  res_A <- fit_global(sid, d_covid, Z_base, y, cov_names)
+
+  # --- Estimator B: Split by Type ---
+  res_B <- fit_split(sid, d_covid, Z_base, y, school_dt, cov_names)
+
+  # --- Estimator C: Proposed Fix ---
+  res_C <- fit_typed_lasso(sid, d_covid, Z_base, y, school_dt,
+                           cov_names, col_means)
+
+  # --- Compute RRR for all ---
+  results <- compute_rrr(school_dt, params, res_A, res_B, res_C,
+                         sid, d_covid, Z_base, col_means)
+
+  rm(Z_base, sid, d_covid, y)
+  gc(verbose = FALSE)
+
+  results
+}
