@@ -5,3 +5,8 @@ R_libs/
 # Allow figures directory but ignore other output
 output/results/
 !output/figures/
+# Un-ignore the specific results directory so file-level rules can apply
+!school_type_fix/output/results/
+school_type_fix/output/results/*
+!school_type_fix/output/results/mc_hyperparams.rds
+!school_type_fix/output/results/true_hyperparams.rds
