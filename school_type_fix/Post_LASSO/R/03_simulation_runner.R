@@ -1,8 +1,13 @@
 # ==============================================================================
-# 03_simulation_runner.R — Monte Carlo Runner (5-Rep)
+# 03_simulation_runner.R — Monte Carlo Runner
 # ==============================================================================
 # Runs Global / Split-by-Type / LASSO-Fix estimators on replicated panels
 # from the type-specific demographic slopes DGP.
+#
+# Reports:
+#   1. Per-rep RRR results (saved as rep_XXX.rds)
+#   2. Monte Carlo distribution of delta hyperparameters (mu_delta, tau2_delta)
+#      vs DGP truth — overall and by school type
 # ==============================================================================
 
 .libPaths(c(file.path(Sys.getenv("HOME"), "A-Levels", "R_libs"), .libPaths()))
@@ -19,24 +24,62 @@ OUT_DIR <- file.path(Sys.getenv("HOME"), "A-Levels", "school_type_fix",
                      "output", "results")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
-# --- CONFIGURATION ---
-N_REPS  <- 5
-N_CORES <- 2
+# --- CONFIGURATION (overridable via --reps N --cores N command-line args) ---
+args_raw <- commandArgs(trailingOnly = TRUE)
+parse_arg <- function(flag, default) {
+  i <- match(flag, args_raw)
+  if (!is.na(i) && i < length(args_raw)) as.integer(args_raw[i + 1L]) else default
+}
+N_REPS  <- parse_arg("--reps",  50L)
+N_CORES <- parse_arg("--cores",  1L)
 
 cat(sprintf("Starting Monte Carlo Simulation (Type-Specific Slopes)\n"))
 cat(sprintf("Cores: %d | Total Reps: %d\n", N_CORES, N_REPS))
 
-# 1. Clean old results
+# 1. Report any existing rep files (checkpoint resume — do NOT delete them)
 old_reps <- list.files(OUT_DIR, pattern = "rep_.*\\.rds", full.names = TRUE)
-if (length(old_reps) > 0) file.remove(old_reps)
+if (length(old_reps) > 0) {
+  cat(sprintf("Found %d existing rep file(s) — will skip those reps (checkpoint resume).\n",
+              length(old_reps)))
+}
 
 # 2. Generate/Save school structure
 school_dt <- generate_school_structure(params, seed = 42L)
 saveRDS(school_dt, file.path(OUT_DIR, "school_structure.rds"))
 verify_dgp(school_dt, params)
 
-# 3. Worker Function
+# 3. Compute TRUE hyperparameters from the DGP
+true_mu_delta    <- mean(school_dt$delta_alpha_j)
+true_tau2_delta  <- var(school_dt$delta_alpha_j)
+true_hp <- data.table(group = "Overall",
+                      mu_delta = true_mu_delta,
+                      tau2_delta = true_tau2_delta)
+for (stype in c("State", "Academy", "Independent")) {
+  idx <- which(school_dt$school_type == stype)
+  true_hp <- rbind(true_hp, data.table(
+    group      = stype,
+    mu_delta   = mean(school_dt$delta_alpha_j[idx]),
+    tau2_delta = var(school_dt$delta_alpha_j[idx])
+  ))
+}
+
+cat("\nTrue delta hyperparameters (from DGP):\n")
+print(true_hp)
+cat("\n")
+
+# 4. Worker Function
 run_one <- function(r) {
+  rep_file <- file.path(OUT_DIR, sprintf("rep_%03d.rds", r))
+
+  # Checkpoint: if this rep was already completed, reload and skip computation
+  if (file.exists(rep_file)) {
+    saved <- tryCatch(readRDS(rep_file), error = function(e) NULL)
+    if (!is.null(saved) && !is.null(saved$hyperparams)) {
+      cat(sprintf("  Rep %d: loaded from checkpoint.\n", r))
+      return(saved)
+    }
+  }
+
   suppressMessages(library(data.table))
   suppressMessages(library(glmnet))
   suppressMessages(library(Matrix))
@@ -44,27 +87,95 @@ run_one <- function(r) {
   cat(sprintf("\n--- Rep %d ---\n", r))
 
   panel <- generate_panel(school_dt, params, seed = r)
-  res <- tryCatch({
+  out <- tryCatch({
     estimate_all(panel, school_dt, params)
   }, error = function(e) {
     cat(sprintf("  ERROR in rep %d: %s\n", r, e$message))
     return(NULL)
   })
 
-  if (!is.null(res)) {
-    res[, rep_id := r]
-    saveRDS(res, file.path(OUT_DIR, sprintf("rep_%03d.rds", r)))
+  if (!is.null(out)) {
+    out$results[, rep_id := r]
+    # Save the FULL out object (results + hyperparams) so checkpointing works
+    saveRDS(out, rep_file)
     cat(sprintf("  Rep %d saved.\n", r))
   }
 
-  rm(panel, res)
+  rm(panel)
   gc(verbose = FALSE)
-  return(r)
+  return(out)
 }
 
-# 4. Execute
+# 5. Execute
 t0 <- proc.time()
-mclapply(1:N_REPS, run_one, mc.cores = N_CORES, mc.preschedule = FALSE)
+all_results <- mclapply(1:N_REPS, run_one, mc.cores = N_CORES,
+                        mc.preschedule = FALSE)
 elapsed <- (proc.time() - t0)["elapsed"]
+cat(sprintf("\nSimulation complete! Total time: %.1f minutes\n", elapsed / 60))
 
-cat(sprintf("\nDone! Total time: %.1f minutes\n", elapsed / 60))
+
+# ==============================================================================
+# 6. MONTE CARLO REPORT: Delta Hyperparameter Distributions
+# ==============================================================================
+cat("\n")
+cat("====================================================================\n")
+cat("  MONTE CARLO REPORT: Delta Hyperparameter Distributions\n")
+cat("====================================================================\n\n")
+
+# Collect hyperparameters across replications
+# If a rep is missing from all_results (e.g. mclapply fork issue), fall back to disk
+hp_list <- list()
+for (r in seq_len(N_REPS)) {
+  res_r <- all_results[[r]]
+  if (is.null(res_r) || is.null(res_r$hyperparams)) {
+    rep_file <- file.path(OUT_DIR, sprintf("rep_%03d.rds", r))
+    if (file.exists(rep_file)) {
+      res_r <- tryCatch(readRDS(rep_file), error = function(e) NULL)
+    }
+  }
+  if (!is.null(res_r) && !is.null(res_r$hyperparams)) {
+    hp_r <- res_r$hyperparams
+    hp_r[, rep_id := r]
+    hp_list[[r]] <- hp_r
+  }
+}
+hp_all <- rbindlist(hp_list)
+n_valid <- length(hp_list)
+
+cat(sprintf("Valid replications: %d / %d\n\n", n_valid, N_REPS))
+
+# --- Report by group and estimator ---
+for (grp in c("Overall", "State", "Academy", "Independent")) {
+  cat(sprintf("--- %s ---\n", grp))
+
+  # True values
+  true_row <- true_hp[group == grp]
+  cat(sprintf("  True:  mu_delta = %.4f,  tau2_delta = %.4f\n",
+              true_row$mu_delta, true_row$tau2_delta))
+
+  for (est in c("A_Global", "B_Split", "C_Fix")) {
+    sub <- hp_all[group == grp & estimator == est]
+    if (nrow(sub) == 0) next
+
+    mu_mean   <- mean(sub$mu_delta)
+    mu_sd     <- sd(sub$mu_delta)
+    mu_bias   <- mu_mean - true_row$mu_delta
+    tau2_mean <- mean(sub$tau2_delta)
+    tau2_sd   <- sd(sub$tau2_delta)
+    tau2_bias <- tau2_mean - true_row$tau2_delta
+
+    cat(sprintf("  %s:\n", est))
+    cat(sprintf("    mu_delta:   mean=%.4f  sd=%.4f  bias=%+.4f\n",
+                mu_mean, mu_sd, mu_bias))
+    cat(sprintf("    tau2_delta: mean=%.4f  sd=%.4f  bias=%+.4f\n",
+                tau2_mean, tau2_sd, tau2_bias))
+  }
+  cat("\n")
+}
+
+# --- Save hyperparameter results ---
+saveRDS(hp_all, file.path(OUT_DIR, "mc_hyperparams.rds"))
+saveRDS(true_hp, file.path(OUT_DIR, "true_hyperparams.rds"))
+cat(sprintf("Hyperparameter results saved to %s\n", OUT_DIR))
+
+cat("\nDone!\n")
