@@ -23,6 +23,14 @@
 # --- Environment ---
 module load R/4.5.1
 
+# Force single-threaded BLAS/OMP in each forked mclapply worker.
+# Without this, forked children inherit a dead OpenBLAS/MKL thread pool
+# and hang on the first crossprod/solve call (0% CPU, never complete).
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export BLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+
 echo "========================================"
 echo " Monte Carlo: grade inflation hyperparams"
 echo " Job ID : $SLURM_JOB_ID"
