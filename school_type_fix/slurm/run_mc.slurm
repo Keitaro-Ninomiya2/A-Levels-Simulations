@@ -14,7 +14,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=48:00:00
+#SBATCH --time=4:00:00
 #SBATCH --output=/u/keitaro2/A-Levels/school_type_fix/slurm/logs/mc_%j.out
 #SBATCH --error=/u/keitaro2/A-Levels/school_type_fix/slurm/logs/mc_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
