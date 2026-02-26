@@ -126,6 +126,7 @@ cat("\n")
 cat("====================================================================\n")
 cat("  MONTE CARLO REPORT: Delta Hyperparameter Distributions\n")
 if (SPLIT_ONLY) cat("  (Split-by-Type estimation only)\n")
+cat("  MAE = mean |est - true|, RMSE = sqrt(mean (est-true)^2) over schools\n")
 cat("====================================================================\n\n")
 
 # Collect hyperparameters across replications
@@ -170,12 +171,21 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
     tau2_mean <- mean(sub$tau2_delta)
     tau2_sd   <- sd(sub$tau2_delta)
     tau2_bias <- tau2_mean - true_row$tau2_delta
-
     cat(sprintf("  %s:\n", est))
     cat(sprintf("    mu_delta:   mean=%.4f  sd=%.4f  bias=%+.4f\n",
                 mu_mean, mu_sd, mu_bias))
     cat(sprintf("    tau2_delta: mean=%.4f  sd=%.4f  bias=%+.4f\n",
                 tau2_mean, tau2_sd, tau2_bias))
+    if ("mae_delta" %in% names(sub)) {
+      mae_mean  <- mean(sub$mae_delta)
+      mae_sd    <- sd(sub$mae_delta)
+      rmse_mean <- mean(sub$rmse_delta)
+      rmse_sd   <- sd(sub$rmse_delta)
+      cat(sprintf("    MAE (school):  mean=%.4f  sd=%.4f  (mean |est-true|)\n",
+                  mae_mean, mae_sd))
+      cat(sprintf("    RMSE (school): mean=%.4f  sd=%.4f  (sqrt mean (est-true)^2)\n",
+                  rmse_mean, rmse_sd))
+    }
   }
   cat("\n")
 }

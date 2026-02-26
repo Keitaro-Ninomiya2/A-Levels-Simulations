@@ -702,28 +702,39 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
 
 
 # ==============================================================================
-# 8. COMPUTE HYPERPARAMETERS FROM EB DELTAS
+# 8. COMPUTE HYPERPARAMETERS AND SCHOOL-LEVEL AGGREGATE ERROR
 # ==============================================================================
 # split_only: if TRUE, only compute for B_Split
+# School-level metrics: MAE (mean |est - true|), RMSE (sqrt(mean (est-true)^2))
 compute_hyperparams <- function(results, split_only = FALSE) {
   hp_list <- list()
   ests <- if (split_only) "B" else c("A", "B", "C")
   est_labels <- c(A = "A_Global", B = "B_Split", C = "C_Fix")
+  true_delta <- results$true_delta
 
   for (est in ests) {
     est_label <- est_labels[[est]]
     delta_col <- paste0(est, "_delta")
     if (!delta_col %in% names(results)) next
 
+    est_vals <- results[[delta_col]]
+
     for (grp in c("Overall", "State", "Academy", "Independent")) {
       idx <- if (grp == "Overall") seq_len(nrow(results))
              else which(results$school_type == grp)
-      vals <- results[[delta_col]][idx]
+      vals   <- est_vals[idx]
+      tvals  <- true_delta[idx]
+      err    <- vals - tvals
+      mae    <- mean(abs(err))
+      rmse   <- sqrt(mean(err^2))
+
       hp_list[[length(hp_list) + 1L]] <- data.table(
         group      = grp,
         estimator  = est_label,
         mu_delta   = mean(vals),
-        tau2_delta = var(vals)
+        tau2_delta = var(vals),
+        mae_delta  = mae,
+        rmse_delta = rmse
       )
     }
   }
