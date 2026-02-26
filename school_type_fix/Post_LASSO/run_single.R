@@ -319,19 +319,15 @@ ref_centered <- rep(0, p)                     # zero on centered scale
 cat(sprintf("  Global reference student (raw): GCSE=%.3f, SES=%.3f, MIN=%.3f, GEN=%.3f\n",
             ref_raw[1], ref_raw[2], ref_raw[3], ref_raw[4]))
 
-# Clamping: use worst-case (Independent) slopes for safety
+# Clamping: comparable outcome — GCSE only (no demo effect on baseline)
 P_BASE_CAP <- 0.85
 alpha_max_all <- max(school_dt$alpha_j)
-worst_et <- params$eta_type[["Independent"]]
-non_gcse_shift <- worst_et["SES"]      * ref_raw[2] +
-                  worst_et["Minority"] * ref_raw[3] +
-                  worst_et["Gender"]   * ref_raw[4]
-max_p <- plogis(alpha_max_all + params$eta_GCSE * ref_raw[1] + non_gcse_shift)
+max_p <- plogis(alpha_max_all + params$eta_GCSE * ref_raw[1])
 
 cat(sprintf("  Max p_base (unclamped): %.3f", max_p))
 if (max_p > P_BASE_CAP) {
   clamp_fn <- function(z) {
-    plogis(alpha_max_all + params$eta_GCSE * z + non_gcse_shift) - P_BASE_CAP
+    plogis(alpha_max_all + params$eta_GCSE * z) - P_BASE_CAP
   }
   gcse_clamp <- uniroot(clamp_fn, interval = c(-5, ref_raw[1]), tol = 1e-8)$root
   cat(sprintf(" -> clamping GCSE from %.3f to %.3f", ref_raw[1], gcse_clamp))
@@ -343,30 +339,23 @@ if (max_p > P_BASE_CAP) {
   ref_raw[8] <- gcse_clamp * ref_raw[4]
   ref_centered <- ref_raw - col_means
 
-  new_p <- plogis(alpha_max_all + params$eta_GCSE * gcse_clamp + non_gcse_shift)
+  new_p <- plogis(alpha_max_all + params$eta_GCSE * gcse_clamp)
   cat(sprintf(", new max: %.3f", new_p))
 }
 cat("\n")
 
 # --- Compute reference shifts for each estimator ---
-# Truth: type-specific slopes applied to FIXED student
+# Truth: comparable outcome — GCSE only in baseline; COVID adds grading bias
 r  <- ref_raw
 rc <- ref_centered
 true_base  <- numeric(J)
 true_covid <- numeric(J)
 for (stype in c("State", "Academy", "Independent")) {
   idx <- which(stypes == stype)
-  et  <- params$eta_type[[stype]]
 
-  true_base[idx] <- params$eta_GCSE * r[1] +
-                    et["SES"]       * r[2] +
-                    et["Minority"]  * r[3] +
-                    et["Gender"]    * r[4]
+  true_base[idx] <- params$eta_GCSE * r[1]
 
-  true_covid[idx] <- (params$eta_GCSE     + params$delta_eta["GCSE_std"]) * r[1] +
-                     (et["SES"]           + params$delta_eta["SES"])      * r[2] +
-                     (et["Minority"]      + params$delta_eta["Minority"]) * r[3] +
-                     (et["Gender"]        + params$delta_eta["Gender"])   * r[4] +
+  true_covid[idx] <- (params$eta_GCSE + params$delta_eta["GCSE_std"]) * r[1] +
                      school_dt$beta_ses_j[idx] * r[2] +
                      school_dt$beta_min_j[idx] * r[3]
 }
@@ -474,19 +463,17 @@ for (stype in c("State", "Academy", "Independent")) {
 }
 cat(sprintf("  Fix (C): %.3f\n", fit_C_post$gamma_b[1]))
 
-cat("\nType interaction estimates vs truth:\n")
-state_slopes <- params$eta_type[["State"]]
+cat("\nType interaction estimates (truth=0 under comparable outcome):\n")
 for (tp in c("Academy", "Independent")) {
-  true_devs <- params$eta_type[[tp]] - state_slopes
   cat(sprintf("  %s deviations:\n", tp))
   if (tp == "Academy") {
     est <- gamma_type_post[1:3]
   } else {
     est <- gamma_type_post[4:6]
   }
-  cat(sprintf("    SES:      true=%+.3f, est=%+.3f\n", true_devs["SES"], est[1]))
-  cat(sprintf("    Minority: true=%+.3f, est=%+.3f\n", true_devs["Minority"], est[2]))
-  cat(sprintf("    Gender:   true=%+.3f, est=%+.3f\n", true_devs["Gender"], est[3]))
+  cat(sprintf("    SES:      true=0, est=%+.3f\n", est[1]))
+  cat(sprintf("    Minority: true=0, est=%+.3f\n", est[2]))
+  cat(sprintf("    Gender:   true=0, est=%+.3f\n", est[3]))
 }
 
 

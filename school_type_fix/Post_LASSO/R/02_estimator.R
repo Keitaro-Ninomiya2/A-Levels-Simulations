@@ -572,18 +572,14 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
   ref_centered <- rep(0, p)                        # zero on centered scale
 
   # --- Clamping: reduce GCSE if max p_base > 0.85 ---
-  # Use the most generous slopes (Independent) for worst-case clamping
+  # Comparable outcome: no demo effect on baseline, so only GCSE matters
   P_BASE_CAP <- 0.85
   alpha_max_all <- max(school_dt$alpha_j)
-  worst_et <- params$eta_type[["Independent"]]
-  non_gcse_shift <- worst_et["SES"]      * ref_raw[2] +
-                    worst_et["Minority"] * ref_raw[3] +
-                    worst_et["Gender"]   * ref_raw[4]
-  max_p <- plogis(alpha_max_all + params$eta_GCSE * ref_raw[1] + non_gcse_shift)
+  max_p <- plogis(alpha_max_all + params$eta_GCSE * ref_raw[1])
 
   if (max_p > P_BASE_CAP) {
     clamp_fn <- function(z) {
-      plogis(alpha_max_all + params$eta_GCSE * z + non_gcse_shift) - P_BASE_CAP
+      plogis(alpha_max_all + params$eta_GCSE * z) - P_BASE_CAP
     }
     gcse_clamp <- uniroot(clamp_fn, interval = c(-5, ref_raw[1]), tol = 1e-8)$root
     ref_raw[1] <- gcse_clamp
@@ -594,23 +590,16 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     ref_centered <- ref_raw - col_means
   }
 
-  # --- Truth: type-specific slopes applied to FIXED student ---
+  # --- Truth: comparable outcome — GCSE only in baseline; COVID adds grading bias ---
   true_base  <- numeric(J)
   true_covid <- numeric(J)
   r <- ref_raw
   for (stype in c("State", "Academy", "Independent")) {
     idx <- which(stypes == stype)
-    et  <- params$eta_type[[stype]]
 
-    base_s <- params$eta_GCSE * r[1] +
-              et["SES"]       * r[2] +
-              et["Minority"]  * r[3] +
-              et["Gender"]    * r[4]
+    base_s <- params$eta_GCSE * r[1]
 
-    covid_s <- (params$eta_GCSE     + params$delta_eta["GCSE_std"]) * r[1] +
-               (et["SES"]           + params$delta_eta["SES"])      * r[2] +
-               (et["Minority"]      + params$delta_eta["Minority"]) * r[3] +
-               (et["Gender"]        + params$delta_eta["Gender"])   * r[4] +
+    covid_s <- (params$eta_GCSE + params$delta_eta["GCSE_std"]) * r[1] +
                school_dt$beta_ses_j[idx] * r[2] +
                school_dt$beta_min_j[idx] * r[3]
 

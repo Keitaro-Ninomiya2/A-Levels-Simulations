@@ -1,19 +1,18 @@
 # ==============================================================================
-# 01_dgp.R — Data Generation Process (Type-Specific Demographic Slopes)
+# 01_dgp.R — Data Generation Process (Comparable Outcome Approach)
 # ==============================================================================
 #
 # Simulates an A-level panel: ~200k students/year x 8 years x ~3,000 schools.
 #   Years 1-7: Stationary exam-based grading.
 #   Year 8:    COVID teacher-assessed grades (inflation + school-specific bias).
 #
-# TRUE DGP has TYPE-SPECIFIC demographic slopes but a COMMON GCSE slope:
-#   z_i = alpha_j + eta_GCSE * GCSE_i + eta_demo_{s(j)} * Demo_i + gamma_k + treatment
+# COMPARABLE OUTCOME: A-level grades do NOT depend on demographics in the DGP.
+#   Baseline: z_i = alpha_j + eta_GCSE * GCSE_i  (ability + school quality only)
+#   COVID:    z_i = baseline + delta_alpha_j + covariate_shift + grading_bias
 #
-# Where s(j) is the school type of school j.
-#
-# Key difference from base simulation:
-#   State/Academy slopes are similar (LASSO should shrink Academy deviations)
-#   Independent slopes differ substantially (LASSO should keep these)
+# Demographics (SES, Minority, Gender) are used only for COVID grading bias:
+#   Teachers inject bias: bias_ses_j * SES + bias_min_j * Minority
+# Estimation controls for demographics to compare students with similar profiles.
 #
 # Exports:
 #   default_params()               - Full parameter list
@@ -57,15 +56,14 @@ default_params <- function() {
     n_students_per_year = 200000L,
 
     # ---- True coefficients ----
-    # Common GCSE slope (same for all school types)
+    # Common GCSE slope (ability proxy) — only covariate affecting baseline outcome
     eta_GCSE = 0.80,
 
-    # Type-specific demographic slopes (the key feature of this DGP)
-    # State is the baseline; Academy deviations are small; Independent large
+    # Demographics do NOT affect baseline outcome (comparable outcome approach)
     eta_type = list(
-      State       = c(SES = 0.40, Minority = -0.20, Gender = 0.10),
-      Academy     = c(SES = 0.45, Minority = -0.15, Gender = 0.12),
-      Independent = c(SES = 0.70, Minority = -0.40, Gender = 0.05)
+      State       = c(SES = 0, Minority = 0, Gender = 0),
+      Academy     = c(SES = 0, Minority = 0, Gender = 0),
+      Independent = c(SES = 0, Minority = 0, Gender = 0)
     ),
 
     # ---- COVID inflation ----
@@ -74,8 +72,8 @@ default_params <- function() {
     delta_1  = 0.3,    # incentive effect: better schools inflate more (university placement)
     sigma_nu = 0.3,    # idiosyncratic school-level noise
 
-    # Aggregate covariate shift during COVID (common across types)
-    delta_eta = c(GCSE_std = 0.15, SES = 0.10, Minority = 0.00, Gender = 0.00),
+    # Aggregate covariate shift during COVID (GCSE only; no demo shift)
+    delta_eta = c(GCSE_std = 0.15, SES = 0, Minority = 0, Gender = 0),
 
     # School-specific COVID bias (NOT in estimation model -> confound)
     bias_ses = list(
@@ -119,14 +117,11 @@ generate_school_structure <- function(params = default_params(), seed = 42L) {
 
   type_vec <- rep(types, times = n_per_type)
 
-  # --- School sizes, quality, COVID bias, and type-specific slopes ---
+  # --- School sizes, quality, COVID bias ---
   size_vec  <- integer(J)
   alpha_vec <- numeric(J)
   bses_vec  <- numeric(J)
   bmin_vec  <- numeric(J)
-  eta_SES_vec <- numeric(J)
-  eta_MIN_vec <- numeric(J)
-  eta_GEN_vec <- numeric(J)
 
   for (tp in types) {
     idx <- which(type_vec == tp)
@@ -140,18 +135,12 @@ generate_school_structure <- function(params = default_params(), seed = 42L) {
     ad <- params$alpha_dist[[tp]]
     alpha_vec[idx] <- rnorm(n, mean = ad["mu"], sd = ad["sigma"])
 
-    # School-specific COVID bias on SES
+    # School-specific COVID grading bias (TAG only)
     bs <- params$bias_ses[[tp]]
     bses_vec[idx] <- rnorm(n, mean = bs["mu"], sd = bs["sigma"])
 
-    # School-specific COVID bias on Minority
     bm <- params$bias_min[[tp]]
     bmin_vec[idx] <- rnorm(n, mean = bm["mu"], sd = bm["sigma"])
-
-    # Type-specific demographic slopes (fixed for all schools of this type)
-    eta_SES_vec[idx] <- params$eta_type[[tp]]["SES"]
-    eta_MIN_vec[idx] <- params$eta_type[[tp]]["Minority"]
-    eta_GEN_vec[idx] <- params$eta_type[[tp]]["Gender"]
   }
 
   # --- COVID school-level inflation ---
@@ -166,10 +155,7 @@ generate_school_structure <- function(params = default_params(), seed = 42L) {
     alpha_j       = alpha_vec,
     delta_alpha_j = dalpha_vec,
     beta_ses_j    = bses_vec,
-    beta_min_j    = bmin_vec,
-    eta_SES_j     = eta_SES_vec,
-    eta_MIN_j     = eta_MIN_vec,
-    eta_GEN_j     = eta_GEN_vec
+    beta_min_j    = bmin_vec
   )
 
   # --- Ground truth: baseline and COVID probs for TYPICAL student of that type ---
@@ -204,12 +190,7 @@ generate_panel <- function(school_dt, params = default_params(), seed = NULL) {
   s_bmin   <- school_dt$beta_min_j
   s_type   <- school_dt$school_type
 
-  # Type-specific demographic slopes (per school)
-  s_eta_SES <- school_dt$eta_SES_j
-  s_eta_MIN <- school_dt$eta_MIN_j
-  s_eta_GEN <- school_dt$eta_GEN_j
-
-  # Per-school probabilities for SES / Minority draws
+  # Per-school probabilities for SES / Minority draws (for grading bias in COVID)
   p_ses_sch <- params$p_ses[as.character(s_type)]
   p_min_sch <- params$p_minority[as.character(s_type)]
 
@@ -218,16 +199,13 @@ generate_panel <- function(school_dt, params = default_params(), seed = NULL) {
   N_per_yr <- length(sch_idx)
 
   # Expand school-level quantities to student-level
-  st_alpha    <- s_alpha[sch_idx]
-  st_dalpha   <- s_dalpha[sch_idx]
-  st_bses     <- s_bses[sch_idx]
-  st_bmin     <- s_bmin[sch_idx]
-  st_sid      <- s_id[sch_idx]
-  st_p_ses    <- p_ses_sch[sch_idx]
-  st_p_min    <- p_min_sch[sch_idx]
-  st_eta_SES  <- s_eta_SES[sch_idx]
-  st_eta_MIN  <- s_eta_MIN[sch_idx]
-  st_eta_GEN  <- s_eta_GEN[sch_idx]
+  st_alpha   <- s_alpha[sch_idx]
+  st_dalpha  <- s_dalpha[sch_idx]
+  st_bses    <- s_bses[sch_idx]
+  st_bmin    <- s_bmin[sch_idx]
+  st_sid     <- s_id[sch_idx]
+  st_p_ses   <- p_ses_sch[sch_idx]
+  st_p_min   <- p_min_sch[sch_idx]
 
   # -- Build panel year by year --
   year_list <- vector("list", T_total)
@@ -241,23 +219,16 @@ generate_panel <- function(school_dt, params = default_params(), seed = NULL) {
     MIN  <- rbinom(N_per_yr, 1L, prob = st_p_min)
     GEN  <- rbinom(N_per_yr, 1L, prob = 0.5)
 
-    # Latent index: alpha_j + COMMON GCSE slope + TYPE-SPECIFIC demo slopes
-    latent <- st_alpha +
-      eta_GCSE    * GCSE +
-      st_eta_SES  * SES  +
-      st_eta_MIN  * MIN  +
-      st_eta_GEN  * GEN
+    # Latent index: comparable outcome — GCSE + school quality only (no demo in baseline)
+    latent <- st_alpha + eta_GCSE * GCSE
 
-    # COVID additions (year 8 only)
+    # COVID additions (year 8 only): inflation + covariate shift + grading bias
     if (is_covid) {
       latent <- latent +
         st_dalpha +                        # school-level inflation
         deta["GCSE_std"] * GCSE +          # aggregate covariate shift
-        deta["SES"]      * SES  +
-        deta["Minority"] * MIN  +
-        deta["Gender"]   * GEN  +
-        st_bses * SES +                    # school-specific SES bias
-        st_bmin * MIN                      # school-specific minority bias
+        st_bses * SES +                    # school-specific SES bias (TAG)
+        st_bmin * MIN                      # school-specific minority bias (TAG)
     }
 
     # Binary outcome
@@ -317,7 +288,7 @@ get_covariate_names <- function(params = default_params()) {
 # ------------------------------------------------------------------------------
 verify_dgp <- function(school_dt, params = default_params()) {
   cat("====================================================================\n")
-  cat("  DGP VERIFICATION (Type-Specific Demographic Slopes)\n")
+  cat("  DGP VERIFICATION (Comparable Outcome — No Demo Effect on Baseline)\n")
   cat("====================================================================\n\n")
 
   # -- School counts --
@@ -337,33 +308,18 @@ verify_dgp <- function(school_dt, params = default_params()) {
                         q90     = round(quantile(alpha_j, 0.90), 3)),
                   by = school_type])
 
-  # -- Type-specific slopes --
-  cat("\n[4] Type-specific demographic slopes:\n")
-  for (tp in names(params$eta_type)) {
-    et <- params$eta_type[[tp]]
-    cat(sprintf("    %s: SES=%.2f, Minority=%.2f, Gender=%.2f\n",
-                tp, et["SES"], et["Minority"], et["Gender"]))
-  }
-  cat(sprintf("    Common GCSE slope: %.2f\n", params$eta_GCSE))
+  # -- Outcome model (comparable outcome) --
+  cat("\n[4] Outcome model: GCSE slope =", params$eta_GCSE,
+      "; demographics = 0 (baseline)\n")
+  cat("    COVID grading bias: beta_ses_j, beta_min_j (school-specific)\n")
 
-  # -- Baseline prob for TYPICAL student of each type --
-  # Uses mean GCSE (= gcse_slope * alpha_j) + type-specific demo means
-  cat("\n[5] Baseline P(Y=1) for typical student of each type:\n")
+  # -- Baseline prob: alpha + GCSE only (no demo) --
+  cat("\n[5] Baseline P(Y=1) for typical student (GCSE = gcse_slope * alpha):\n")
   for (tp in c("State", "Academy", "Independent")) {
     mask <- school_dt$school_type == tp
     alpha_j <- school_dt$alpha_j[mask]
     gcse_mean <- params$gcse_slope * alpha_j
-    ses_mean  <- params$p_ses[tp]
-    min_mean  <- params$p_minority[tp]
-    gen_mean  <- 0.5
-    et        <- params$eta_type[[tp]]
-
-    latent <- alpha_j +
-      params$eta_GCSE * gcse_mean +
-      et["SES"]      * ses_mean +
-      et["Minority"] * min_mean +
-      et["Gender"]   * gen_mean
-
+    latent <- alpha_j + params$eta_GCSE * gcse_mean
     p_base <- plogis(latent)
     cat(sprintf("    %s: mean=%.3f, median=%.3f, q10=%.3f, q90=%.3f\n",
                 tp, mean(p_base), median(p_base),
@@ -388,15 +344,6 @@ verify_dgp <- function(school_dt, params = default_params()) {
                         mean_inflation_pp = round(mean(true_inflation), 3),
                         mean_rrr      = round(mean(true_rrr), 3)),
                   by = school_type])
-
-  # -- Slope deviation from State baseline --
-  cat("\n[8] Slope deviations from State (what LASSO should detect):\n")
-  state_slopes <- params$eta_type[["State"]]
-  for (tp in c("Academy", "Independent")) {
-    devs <- params$eta_type[[tp]] - state_slopes
-    cat(sprintf("    %s deviation: SES=%+.2f, Minority=%+.2f, Gender=%+.2f\n",
-                tp, devs["SES"], devs["Minority"], devs["Gender"]))
-  }
 
   cat("\n====================================================================\n")
   cat("  VERIFICATION COMPLETE\n")
