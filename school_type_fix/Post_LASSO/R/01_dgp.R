@@ -1,18 +1,19 @@
 # ==============================================================================
-# 01_dgp.R — Data Generation Process (Comparable Outcome Approach)
+# 01_dgp.R — Data Generation Process (Aligned with UK Grading Paper)
 # ==============================================================================
 #
-# Simulates an A-level panel: ~200k students/year x 8 years x ~3,000 schools.
-#   Years 1-7: Stationary exam-based grading.
-#   Year 8:    COVID teacher-assessed grades (inflation + school-specific bias).
+# Simulates an A-level panel matching the UCAS/UK grading paper structure:
+#   ~200k students/year x 8 years x ~3,000 schools (State 60%, Academy 33%, Indep 7%)
+#   Years 1-7: Standardized exam-based grading (Conditional Stationarity).
+#   Year 8:    COVID teacher-assessed grades (TAG).
 #
-# COMPARABLE OUTCOME: A-level grades do NOT depend on demographics in the DGP.
-#   Baseline: z_i = alpha_j + eta_GCSE * GCSE_i  (ability + school quality only)
-#   COVID:    z_i = baseline + delta_alpha_j + covariate_shift + grading_bias
-#
-# Demographics (SES, Minority, Gender) are used only for COVID grading bias:
-#   Teachers inject bias: bias_ses_j * SES + bias_min_j * Minority
-# Estimation controls for demographics to compare students with similar profiles.
+# PAPER ALIGNMENT:
+#   - Comparable outcome: Baseline grades do NOT depend on demographics (exam marked
+#     blindly; Conditional Stationarity). Only GCSE (prior attainment) + school quality.
+#   - COVID inflation: delta_alpha_j = delta_0 + delta_0_type[s(j)] + delta_1*alpha_j + nu_j
+#     (paper: "grade inflation was higher in lower-quality schools").
+#   - Independent schools inflate more (type-specific intercept in delta).
+#   - School-specific grading bias during TAG: beta_ses_j, beta_min_j.
 #
 # Exports:
 #   default_params()               - Full parameter list
@@ -35,10 +36,11 @@ default_params <- function() {
     type_shares = c(State = 0.60, Academy = 0.33, Independent = 0.07),
 
     # Students per school per year ~ Uniform(lo, hi)
+    # Paper: "schools with more than 30 students in pandemic years" (sample selection)
     size_range = list(
       State       = c(30L, 150L),
-      Academy     = c(25L, 120L),
-      Independent = c(15L, 80L)
+      Academy     = c(30L, 120L),
+      Independent = c(30L, 80L)
     ),
 
     # School quality: alpha_j ~ N(mu, sigma^2), by type
@@ -67,9 +69,12 @@ default_params <- function() {
     ),
 
     # ---- COVID inflation ----
-    # Delta_alpha_j = delta_0 + delta_1 * alpha_j + nu_j
+    # Delta_alpha_j = delta_0 + delta_0_type[s(j)] + delta_1 * alpha_j + nu_j
+    # Paper: "grade inflation was higher in lower-quality schools" -> delta_1 < 0
+    # Paper: "Independent schools inflated their pupils' grades more" -> delta_0_type[Indep] > 0
     delta_0  = 1.0,    # general upward shift (logit scale)
-    delta_1  = 0.3,    # incentive effect: better schools inflate more (university placement)
+    delta_1  = -0.3,   # higher-quality schools inflate less (paper: ~0.45 pp per quality unit)
+    delta_0_type = c(State = 0, Academy = 0, Independent = 0.4),  # Independent inflates more
     sigma_nu = 0.3,    # idiosyncratic school-level noise
 
     # Aggregate covariate shift during COVID (GCSE only; no demo shift)
@@ -145,7 +150,8 @@ generate_school_structure <- function(params = default_params(), seed = 42L) {
 
   # --- COVID school-level inflation ---
   nu_vec     <- rnorm(J, mean = 0, sd = params$sigma_nu)
-  dalpha_vec <- params$delta_0 + params$delta_1 * alpha_vec + nu_vec
+  delta_0_by_type <- params$delta_0_type[as.character(type_vec)]
+  dalpha_vec <- params$delta_0 + delta_0_by_type + params$delta_1 * alpha_vec + nu_vec
 
   # --- Assemble school data.table ---
   school_dt <- data.table(
