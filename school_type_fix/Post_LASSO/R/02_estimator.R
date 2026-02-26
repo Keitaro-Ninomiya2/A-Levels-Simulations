@@ -558,8 +558,10 @@ fit_typed_lasso <- function(sid, d_covid, Z_base, y, school_dt,
 # ==============================================================================
 # 7. COMPUTE RRR FOR ALL ESTIMATORS
 # ==============================================================================
+# split_only: if TRUE, only compute B (Split-by-Type); res_A and res_C can be NULL
 compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
-                        sid, d_covid, Z_base, col_means) {
+                        sid, d_covid, Z_base, col_means,
+                        split_only = FALSE) {
   J <- nrow(school_dt)
   p <- ncol(Z_base)
   stypes <- as.character(school_dt$school_type)
@@ -607,10 +609,7 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     true_covid[idx] <- covid_s
   }
 
-  # --- Estimator A (Global): common gamma, fixed student ---
   rc <- ref_centered
-  A_base  <- rep(drop(rc %*% res_A$fit$gamma_b), J)
-  A_covid <- rep(drop(rc %*% (res_A$fit$gamma_b + res_A$fit$gamma_c)), J)
 
   # --- Estimator B (Split): type-specific gamma, fixed student ---
   B_base  <- numeric(J)
@@ -622,33 +621,7 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     B_covid[idx] <- drop(rc %*% (f$gamma_b + f$gamma_c))
   }
 
-  # --- Estimator C (Fix): fixed student, type interactions from LASSO ---
-  C_base  <- numeric(J)
-  C_covid <- numeric(J)
-  p_post         <- res_C$p_post
-  sel_rest_zcols <- res_C$sel_rest_zcols
-  fit_post       <- res_C$fit_post
-  for (stype in c("State", "Academy", "Independent")) {
-    idx <- which(stypes == stype)
-
-    # Build reference profile in Z_post coordinates using FIXED student
-    # but activating type interaction columns for this school type
-    rc_post <- numeric(p_post)
-    rc_post[1:4] <- rc[1:4]
-    if (stype == "Academy") {
-      rc_post[5:7] <- rc[2:4]       # Demo × Acad interactions
-    } else if (stype == "Independent") {
-      rc_post[8:10] <- rc[2:4]      # Demo × Indep interactions
-    }
-    if (length(sel_rest_zcols) > 0) {
-      rc_post[11:p_post] <- rc[sel_rest_zcols]
-    }
-
-    C_base[idx]  <- drop(rc_post %*% fit_post$gamma_b)
-    C_covid[idx] <- drop(rc_post %*% (fit_post$gamma_b + fit_post$gamma_c))
-  }
-
-  # --- Build results table ---
+  # --- Build results table (B always; A and C only when not split_only) ---
   results <- data.table(
     school_id   = school_dt$school_id,
     school_type = school_dt$school_type,
@@ -659,27 +632,57 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     true_p0  = plogis(school_dt$alpha_j + true_base),
     true_p1  = plogis(school_dt$alpha_j + school_dt$delta_alpha_j + true_covid),
 
-    # Estimator A (Global)
-    A_alpha = res_A$eb_alpha,
-    A_delta = res_A$eb_delta,
-    A_p0    = plogis(res_A$eb_alpha + A_base),
-    A_p1    = plogis(res_A$eb_alpha + res_A$eb_delta + A_covid),
-
     # Estimator B (Split)
     B_alpha = res_B$eb_alpha,
     B_delta = res_B$eb_delta,
     B_p0    = plogis(res_B$eb_alpha + B_base),
-    B_p1    = plogis(res_B$eb_alpha + res_B$eb_delta + B_covid),
-
-    # Estimator C (Fix)
-    C_alpha = res_C$eb_alpha,
-    C_delta = res_C$eb_delta,
-    C_p0    = plogis(res_C$eb_alpha + C_base),
-    C_p1    = plogis(res_C$eb_alpha + res_C$eb_delta + C_covid)
+    B_p1    = plogis(res_B$eb_alpha + res_B$eb_delta + B_covid)
   )
 
+  if (!split_only) {
+    # --- Estimator A (Global): common gamma, fixed student ---
+    A_base  <- rep(drop(rc %*% res_A$fit$gamma_b), J)
+    A_covid <- rep(drop(rc %*% (res_A$fit$gamma_b + res_A$fit$gamma_c)), J)
+
+    # --- Estimator C (Fix): fixed student, type interactions from LASSO ---
+    C_base  <- numeric(J)
+    C_covid <- numeric(J)
+    p_post         <- res_C$p_post
+    sel_rest_zcols <- res_C$sel_rest_zcols
+    fit_post       <- res_C$fit_post
+    for (stype in c("State", "Academy", "Independent")) {
+      idx <- which(stypes == stype)
+
+      rc_post <- numeric(p_post)
+      rc_post[1:4] <- rc[1:4]
+      if (stype == "Academy") {
+        rc_post[5:7] <- rc[2:4]
+      } else if (stype == "Independent") {
+        rc_post[8:10] <- rc[2:4]
+      }
+      if (length(sel_rest_zcols) > 0) {
+        rc_post[11:p_post] <- rc[sel_rest_zcols]
+      }
+
+      C_base[idx]  <- drop(rc_post %*% fit_post$gamma_b)
+      C_covid[idx] <- drop(rc_post %*% (fit_post$gamma_b + fit_post$gamma_c))
+    }
+
+    results[, `:=`(
+      A_alpha = res_A$eb_alpha,
+      A_delta = res_A$eb_delta,
+      A_p0    = plogis(res_A$eb_alpha + A_base),
+      A_p1    = plogis(res_A$eb_alpha + res_A$eb_delta + A_covid),
+      C_alpha = res_C$eb_alpha,
+      C_delta = res_C$eb_delta,
+      C_p0    = plogis(res_C$eb_alpha + C_base),
+      C_p1    = plogis(res_C$eb_alpha + res_C$eb_delta + C_covid)
+    )]
+  }
+
   # Derived quantities
-  for (prefix in c("true", "A", "B", "C")) {
+  prefixes <- if (split_only) c("true", "B") else c("true", "A", "B", "C")
+  for (prefix in prefixes) {
     p0_col  <- paste0(prefix, "_p0")
     p1_col  <- paste0(prefix, "_p1")
     raw_col <- paste0(prefix, "_raw")
@@ -701,11 +704,16 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
 # ==============================================================================
 # 8. COMPUTE HYPERPARAMETERS FROM EB DELTAS
 # ==============================================================================
-compute_hyperparams <- function(results) {
+# split_only: if TRUE, only compute for B_Split
+compute_hyperparams <- function(results, split_only = FALSE) {
   hp_list <- list()
-  for (est in c("A", "B", "C")) {
-    est_label <- c(A = "A_Global", B = "B_Split", C = "C_Fix")[[est]]
+  ests <- if (split_only) "B" else c("A", "B", "C")
+  est_labels <- c(A = "A_Global", B = "B_Split", C = "C_Fix")
+
+  for (est in ests) {
+    est_label <- est_labels[[est]]
     delta_col <- paste0(est, "_delta")
+    if (!delta_col %in% names(results)) next
 
     for (grp in c("Overall", "State", "Academy", "Independent")) {
       idx <- if (grp == "Overall") seq_len(nrow(results))
@@ -726,7 +734,8 @@ compute_hyperparams <- function(results) {
 # ==============================================================================
 # 9. ORCHESTRATOR
 # ==============================================================================
-estimate_all <- function(panel, school_dt, params) {
+# split_only: if TRUE, only run Split-by-Type (B); avoids extrapolation bias
+estimate_all <- function(panel, school_dt, params, split_only = FALSE) {
   J         <- nrow(school_dt)
   cov_names <- get_covariate_names(params)
   p         <- length(cov_names)
@@ -745,22 +754,27 @@ estimate_all <- function(panel, school_dt, params) {
   cat(sprintf("    J = %d schools, p = %d covariates, N = %s\n",
               J, p, format(length(y), big.mark = ",")))
 
-  # --- Estimator A: Global ---
-  res_A <- fit_global(sid, d_covid, Z_base, y, cov_names, school_dt)
-
-  # --- Estimator B: Split by Type ---
+  # --- Estimator B: Split by Type (always run) ---
   res_B <- fit_split(sid, d_covid, Z_base, y, school_dt, cov_names)
 
-  # --- Estimator C: Proposed Fix ---
-  res_C <- fit_typed_lasso(sid, d_covid, Z_base, y, school_dt,
-                           cov_names, col_means)
+  if (split_only) {
+    # --- Compute RRR for B only ---
+    results <- compute_rrr(school_dt, params, NULL, res_B, NULL,
+                          sid, d_covid, Z_base, col_means, split_only = TRUE)
+    hyperparams <- compute_hyperparams(results, split_only = TRUE)
+  } else {
+    # --- Estimator A: Global ---
+    res_A <- fit_global(sid, d_covid, Z_base, y, cov_names, school_dt)
 
-  # --- Compute RRR for all ---
-  results <- compute_rrr(school_dt, params, res_A, res_B, res_C,
-                         sid, d_covid, Z_base, col_means)
+    # --- Estimator C: Proposed Fix ---
+    res_C <- fit_typed_lasso(sid, d_covid, Z_base, y, school_dt,
+                             cov_names, col_means)
 
-  # --- Compute hyperparameters ---
-  hyperparams <- compute_hyperparams(results)
+    # --- Compute RRR for all ---
+    results <- compute_rrr(school_dt, params, res_A, res_B, res_C,
+                          sid, d_covid, Z_base, col_means, split_only = FALSE)
+    hyperparams <- compute_hyperparams(results, split_only = FALSE)
+  }
 
   rm(Z_base, sid, d_covid, y)
   gc(verbose = FALSE)

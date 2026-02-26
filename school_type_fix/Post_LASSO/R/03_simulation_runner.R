@@ -1,8 +1,10 @@
 # ==============================================================================
 # 03_simulation_runner.R — Monte Carlo Runner
 # ==============================================================================
-# Runs Global / Split-by-Type / LASSO-Fix estimators on replicated panels
-# from the type-specific demographic slopes DGP.
+# Runs estimators on replicated panels from the type-specific DGP.
+#
+# With --split-only: Only Split-by-Type (B) — avoids extrapolation bias.
+# Without:          Global (A) + Split (B) + LASSO-Fix (C).
 #
 # Reports:
 #   1. Per-rep RRR results (saved as rep_XXX.rds)
@@ -24,17 +26,22 @@ OUT_DIR <- file.path(Sys.getenv("HOME"), "A-Levels", "school_type_fix",
                      "output", "results")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
-# --- CONFIGURATION (overridable via --reps N --cores N command-line args) ---
+# --- CONFIGURATION (overridable via --reps N --cores N --split-only) ---
 args_raw <- commandArgs(trailingOnly = TRUE)
 parse_arg <- function(flag, default) {
   i <- match(flag, args_raw)
   if (!is.na(i) && i < length(args_raw)) as.integer(args_raw[i + 1L]) else default
 }
-N_REPS  <- parse_arg("--reps",  50L)
-N_CORES <- parse_arg("--cores",  1L)
+parse_flag <- function(flag) {
+  flag %in% args_raw
+}
+N_REPS     <- parse_arg("--reps",  50L)
+N_CORES    <- parse_arg("--cores",  1L)
+SPLIT_ONLY <- parse_flag("--split-only")
 
 cat(sprintf("Starting Monte Carlo Simulation (Type-Specific Slopes)\n"))
-cat(sprintf("Cores: %d | Total Reps: %d\n", N_CORES, N_REPS))
+cat(sprintf("Cores: %d | Total Reps: %d | Split-only (B): %s\n",
+            N_CORES, N_REPS, if (SPLIT_ONLY) "YES" else "NO"))
 
 # 1. Report any existing rep files (checkpoint resume — do NOT delete them)
 old_reps <- list.files(OUT_DIR, pattern = "rep_.*\\.rds", full.names = TRUE)
@@ -87,7 +94,7 @@ run_one <- function(r) {
 
   panel <- generate_panel(school_dt, params, seed = r)
   out <- tryCatch({
-    estimate_all(panel, school_dt, params)
+    estimate_all(panel, school_dt, params, split_only = SPLIT_ONLY)
   }, error = function(e) {
     cat(sprintf("  ERROR in rep %d: %s\n", r, e$message))
     return(NULL)
@@ -118,6 +125,7 @@ cat(sprintf("\nSimulation complete! Total time: %.1f minutes\n", elapsed / 60))
 cat("\n")
 cat("====================================================================\n")
 cat("  MONTE CARLO REPORT: Delta Hyperparameter Distributions\n")
+if (SPLIT_ONLY) cat("  (Split-by-Type estimation only)\n")
 cat("====================================================================\n\n")
 
 # Collect hyperparameters across replications
@@ -143,6 +151,7 @@ n_valid <- length(hp_list)
 cat(sprintf("Valid replications: %d / %d\n\n", n_valid, N_REPS))
 
 # --- Report by group and estimator ---
+report_ests <- if (SPLIT_ONLY) "B_Split" else c("A_Global", "B_Split", "C_Fix")
 for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("--- %s ---\n", grp))
 
@@ -151,7 +160,7 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("  True:  mu_delta = %.4f,  tau2_delta = %.4f\n",
               true_row$mu_delta, true_row$tau2_delta))
 
-  for (est in c("A_Global", "B_Split", "C_Fix")) {
+  for (est in report_ests) {
     sub <- hp_all[group == grp & estimator == est]
     if (nrow(sub) == 0) next
 

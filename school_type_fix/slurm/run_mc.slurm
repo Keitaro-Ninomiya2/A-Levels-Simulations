@@ -1,7 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# run_mc.slurm — Monte Carlo simulation: grade-inflation hyperparameter recovery
+# run_mc.slurm — Monte Carlo: grade-inflation hyperparams (Split-by-Type only)
 # ==============================================================================
+# Estimation done by school type only (B_Split) to avoid extrapolation bias.
 # Submit with:  sbatch slurm/run_mc.slurm
 # Monitor with: squeue -u keitaro2
 # Output:       slurm/logs/mc_<jobid>.out
@@ -50,7 +51,8 @@ rm -f output/results/rep_*.rds
 
 Rscript Post_LASSO/R/03_simulation_runner.R \
   --reps  50 \
-  --cores "$SLURM_CPUS_PER_TASK"
+  --cores "$SLURM_CPUS_PER_TASK" \
+  --split-only
 
 echo "========================================"
 echo " Finished: $(date)"
