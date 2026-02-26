@@ -74,6 +74,10 @@ cat("\nTrue delta hyperparameters (from DGP):\n")
 print(true_hp)
 cat("\n")
 
+# True RRR requires a panel to compute reference-student probabilities,
+# so we store placeholders and fill from the first valid replication.
+true_rrr_hp <- NULL
+
 # 4. Worker Function
 run_one <- function(r) {
   rep_file <- file.path(OUT_DIR, sprintf("rep_%03d.rds", r))
@@ -151,6 +155,31 @@ n_valid <- length(hp_list)
 
 cat(sprintf("Valid replications: %d / %d\n\n", n_valid, N_REPS))
 
+# --- Compute true RRR from the first valid replication's results ---
+true_rrr_hp <- NULL
+for (r in seq_len(N_REPS)) {
+  res_r <- all_results[[r]]
+  if (!is.list(res_r) || is.null(res_r$results)) {
+    rep_file <- file.path(OUT_DIR, sprintf("rep_%03d.rds", r))
+    if (file.exists(rep_file)) res_r <- tryCatch(readRDS(rep_file), error = function(e) NULL)
+  }
+  if (is.list(res_r) && "true_rrr" %in% names(res_r$results)) {
+    rr <- res_r$results
+    true_rrr_hp <- data.table(group = "Overall", mu_rrr = mean(rr$true_rrr))
+    for (stype in c("State", "Academy", "Independent")) {
+      idx_s <- which(rr$school_type == stype)
+      true_rrr_hp <- rbind(true_rrr_hp,
+                           data.table(group = stype, mu_rrr = mean(rr$true_rrr[idx_s])))
+    }
+    break
+  }
+}
+if (!is.null(true_rrr_hp)) {
+  cat("True mean RRR (from DGP, reference student):\n")
+  print(true_rrr_hp)
+  cat("\n")
+}
+
 # --- Report by group and estimator ---
 report_ests <- if (SPLIT_ONLY) c("B_Split", "B_Raw", "B_DL") else c("A_Global", "B_Split", "C_Fix", "B_Raw", "B_DL")
 for (grp in c("Overall", "State", "Academy", "Independent")) {
@@ -158,8 +187,13 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
 
   # True values
   true_row <- true_hp[group == grp]
-  cat(sprintf("  True:  mu_delta = %.4f,  tau2_delta = %.4f\n",
+  cat(sprintf("  True:  mu_delta = %.4f,  tau2_delta = %.4f",
               true_row$mu_delta, true_row$tau2_delta))
+  if (!is.null(true_rrr_hp)) {
+    trrr <- true_rrr_hp[group == grp]$mu_rrr
+    cat(sprintf(",  mu_rrr = %.4f", trrr))
+  }
+  cat("\n")
 
   for (est in report_ests) {
     sub <- hp_all[group == grp & estimator == est]
@@ -181,10 +215,22 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
       mae_sd    <- sd(sub$mae_delta)
       rmse_mean <- mean(sub$rmse_delta)
       rmse_sd   <- sd(sub$rmse_delta)
-      cat(sprintf("    MAE (school):  mean=%.4f  sd=%.4f  (mean |est-true|)\n",
-                  mae_mean, mae_sd))
-      cat(sprintf("    RMSE (school): mean=%.4f  sd=%.4f  (sqrt mean (est-true)^2)\n",
-                  rmse_mean, rmse_sd))
+      cat(sprintf("    MAE (school):  mean=%.4f  sd=%.4f\n", mae_mean, mae_sd))
+      cat(sprintf("    RMSE (school): mean=%.4f  sd=%.4f\n", rmse_mean, rmse_sd))
+    }
+    if ("mu_rrr" %in% names(sub) && !all(is.na(sub$mu_rrr)) && !is.null(true_rrr_hp)) {
+      trrr       <- true_rrr_hp[group == grp]$mu_rrr
+      rrr_mean   <- mean(sub$mu_rrr)
+      rrr_sd     <- sd(sub$mu_rrr)
+      rrr_bias   <- rrr_mean - trrr
+      rrr_mae_m  <- mean(sub$rrr_mae, na.rm = TRUE)
+      rrr_mae_s  <- sd(sub$rrr_mae, na.rm = TRUE)
+      rrr_rmse_m <- mean(sub$rrr_rmse, na.rm = TRUE)
+      rrr_rmse_s <- sd(sub$rrr_rmse, na.rm = TRUE)
+      cat(sprintf("    mu_rrr:     mean=%.4f  sd=%.4f  bias=%+.4f\n",
+                  rrr_mean, rrr_sd, rrr_bias))
+      cat(sprintf("    RRR MAE:    mean=%.4f  sd=%.4f\n", rrr_mae_m, rrr_mae_s))
+      cat(sprintf("    RRR RMSE:   mean=%.4f  sd=%.4f\n", rrr_rmse_m, rrr_rmse_s))
     }
   }
   cat("\n")
@@ -193,6 +239,7 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
 # --- Save hyperparameter results ---
 saveRDS(hp_all, file.path(OUT_DIR, "mc_hyperparams.rds"))
 saveRDS(true_hp, file.path(OUT_DIR, "true_hyperparams.rds"))
+if (!is.null(true_rrr_hp)) saveRDS(true_rrr_hp, file.path(OUT_DIR, "true_rrr_hp.rds"))
 cat(sprintf("Hyperparameter results saved to %s\n", OUT_DIR))
 
 cat("\nDone!\n")

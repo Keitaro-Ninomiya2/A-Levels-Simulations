@@ -723,6 +723,16 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
 compute_hyperparams <- function(results, split_only = FALSE) {
   hp_list <- list()
   true_delta <- results$true_delta
+  true_rrr   <- results$true_rrr
+
+  # Helper: compute RRR stats for a given estimator's RRR column
+  rrr_stats <- function(idx, rrr_col) {
+    if (!rrr_col %in% names(results)) return(list(mu = NA_real_, mae = NA_real_, rmse = NA_real_))
+    est_rrr  <- results[[rrr_col]][idx]
+    tru_rrr  <- true_rrr[idx]
+    rrr_err  <- est_rrr - tru_rrr
+    list(mu = mean(est_rrr), mae = mean(abs(rrr_err)), rmse = sqrt(mean(rrr_err^2)))
+  }
 
   # EB-shrunk estimators
   ests <- if (split_only) "B" else c("A", "B", "C")
@@ -731,6 +741,7 @@ compute_hyperparams <- function(results, split_only = FALSE) {
   for (est in ests) {
     est_label <- est_labels[[est]]
     delta_col <- paste0(est, "_delta")
+    rrr_col   <- paste0(est, "_rrr")
     if (!delta_col %in% names(results)) next
 
     est_vals <- results[[delta_col]]
@@ -741,16 +752,18 @@ compute_hyperparams <- function(results, split_only = FALSE) {
       vals   <- est_vals[idx]
       tvals  <- true_delta[idx]
       err    <- vals - tvals
-      mae    <- mean(abs(err))
-      rmse   <- sqrt(mean(err^2))
+      rs     <- rrr_stats(idx, rrr_col)
 
       hp_list[[length(hp_list) + 1L]] <- data.table(
         group      = grp,
         estimator  = est_label,
         mu_delta   = mean(vals),
         tau2_delta = var(vals),
-        mae_delta  = mae,
-        rmse_delta = rmse
+        mae_delta  = mean(abs(err)),
+        rmse_delta = sqrt(mean(err^2)),
+        mu_rrr     = rs$mu,
+        rrr_mae    = rs$mae,
+        rrr_rmse   = rs$rmse
       )
     }
   }
@@ -765,16 +778,17 @@ compute_hyperparams <- function(results, split_only = FALSE) {
       vals   <- raw_vals[idx]
       tvals  <- true_delta[idx]
       err    <- vals - tvals
-      mae    <- mean(abs(err))
-      rmse   <- sqrt(mean(err^2))
 
       hp_list[[length(hp_list) + 1L]] <- data.table(
         group      = grp,
         estimator  = "B_Raw",
         mu_delta   = mean(vals),
         tau2_delta = var(vals),
-        mae_delta  = mae,
-        rmse_delta = rmse
+        mae_delta  = mean(abs(err)),
+        rmse_delta = sqrt(mean(err^2)),
+        mu_rrr     = NA_real_,
+        rrr_mae    = NA_real_,
+        rrr_rmse   = NA_real_
       )
     }
   }
@@ -784,6 +798,7 @@ compute_hyperparams <- function(results, split_only = FALSE) {
   if (raw_col %in% names(results) && se_col %in% names(results)) {
     raw_vals <- results[[raw_col]]
     se_vals  <- results[[se_col]]
+    has_rrr  <- "B_rrr" %in% names(results)
     for (grp in c("Overall", "State", "Academy", "Independent")) {
       idx <- if (grp == "Overall") seq_len(nrow(results))
              else which(results$school_type == grp)
@@ -803,17 +818,31 @@ compute_hyperparams <- function(results, split_only = FALSE) {
       w_re  <- 1 / (se_j^2 + tau2)
       mu_dl <- sum(w_re * d_j) / sum(w_re)
 
-      err   <- d_j - tvals
-      mae   <- mean(abs(err))
-      rmse  <- sqrt(mean(err^2))
+      err  <- d_j - tvals
+
+      # Precision-weighted mean RRR using the same RE weights
+      mu_rrr_dl  <- NA_real_
+      rrr_mae_dl <- NA_real_
+      rrr_rmse_dl <- NA_real_
+      if (has_rrr) {
+        est_rrr <- results[["B_rrr"]][idx]
+        tru_rrr <- true_rrr[idx]
+        mu_rrr_dl  <- sum(w_re * est_rrr) / sum(w_re)
+        rrr_err    <- est_rrr - tru_rrr
+        rrr_mae_dl <- mean(abs(rrr_err))
+        rrr_rmse_dl <- sqrt(mean(rrr_err^2))
+      }
 
       hp_list[[length(hp_list) + 1L]] <- data.table(
         group      = grp,
         estimator  = "B_DL",
         mu_delta   = mu_dl,
         tau2_delta = tau2,
-        mae_delta  = mae,
-        rmse_delta = rmse
+        mae_delta  = mean(abs(err)),
+        rmse_delta = sqrt(mean(err^2)),
+        mu_rrr     = mu_rrr_dl,
+        rrr_mae    = rrr_mae_dl,
+        rrr_rmse   = rrr_rmse_dl
       )
     }
   }
