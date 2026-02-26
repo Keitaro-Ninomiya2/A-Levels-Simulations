@@ -181,7 +181,7 @@ if (!is.null(true_rrr_hp)) {
 }
 
 # --- Report by group and estimator ---
-report_ests <- if (SPLIT_ONLY) c("B_Split", "B_Raw", "B_DL") else c("A_Global", "B_Split", "C_Fix", "B_Raw", "B_DL")
+report_ests <- if (SPLIT_ONLY) c("B_Split", "B_Firth", "B_DL", "B_Firth_DL") else c("A_Global", "B_Split", "C_Fix", "B_Firth", "B_DL", "B_Firth_DL")
 for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("--- %s ---\n", grp))
 
