@@ -517,14 +517,12 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
   J <- nrow(school_dt)
   student_type <- school_dt$school_type[sid]
 
-  eb_alpha_all    <- numeric(J)
-  eb_delta_all    <- numeric(J)
-  raw_alpha_all   <- numeric(J)
-  raw_delta_all   <- numeric(J)
-  se_delta_all    <- numeric(J)
-  firth_alpha_all <- numeric(J)
-  firth_delta_all <- numeric(J)
-  fit_list        <- list()
+  eb_alpha_all  <- numeric(J)
+  eb_delta_all  <- numeric(J)
+  raw_alpha_all <- numeric(J)
+  raw_delta_all <- numeric(J)
+  se_delta_all  <- numeric(J)
+  fit_list      <- list()
 
   for (stype in c("State", "Academy", "Independent")) {
     cat(sprintf("      %s: ", stype))
@@ -547,17 +545,12 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
     eb_a <- eb_shrink(fit_s$alpha, se_s$se_alpha, tau2_floor = 0.02)
     eb_d <- eb_shrink(fit_s$delta, se_s$se_delta, tau2_floor = 0.02)
 
-    # Firth bias correction
-    fc <- firth_correct(s_sid, s_dcov, s_Z, fit_s, use_covid_cov = TRUE)
-
     # Map back to global school IDs
-    eb_alpha_all[s_orig_ids]    <- eb_a
-    eb_delta_all[s_orig_ids]    <- eb_d
-    raw_alpha_all[s_orig_ids]   <- fit_s$alpha
-    raw_delta_all[s_orig_ids]   <- fit_s$delta
-    se_delta_all[s_orig_ids]    <- se_s$se_delta
-    firth_alpha_all[s_orig_ids] <- fc$alpha
-    firth_delta_all[s_orig_ids] <- fc$delta
+    eb_alpha_all[s_orig_ids]  <- eb_a
+    eb_delta_all[s_orig_ids]  <- eb_d
+    raw_alpha_all[s_orig_ids] <- fit_s$alpha
+    raw_delta_all[s_orig_ids] <- fit_s$delta
+    se_delta_all[s_orig_ids]  <- se_s$se_delta
 
     fit_list[[stype]] <- list(fit = fit_s, se = se_s,
                                eb_alpha = eb_a, eb_delta = eb_d,
@@ -567,9 +560,7 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
   cat(sprintf("    [B] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
   list(eb_alpha = eb_alpha_all, eb_delta = eb_delta_all,
        raw_alpha = raw_alpha_all, raw_delta = raw_delta_all,
-       se_delta = se_delta_all,
-       firth_alpha = firth_alpha_all, firth_delta = firth_delta_all,
-       fits = fit_list)
+       se_delta = se_delta_all, fits = fit_list)
 }
 
 
@@ -834,13 +825,7 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     # Estimator B (Split) — raw (unshrunk) and standard errors
     B_raw_alpha = res_B$raw_alpha,
     B_raw_delta = res_B$raw_delta,
-    B_se_delta  = res_B$se_delta,
-
-    # Estimator B (Split) — Firth bias-corrected (same gamma, corrected alpha/delta)
-    B_firth_alpha = res_B$firth_alpha,
-    B_firth_delta = res_B$firth_delta,
-    B_firth_p0    = plogis(res_B$firth_alpha + B_base),
-    B_firth_p1    = plogis(res_B$firth_alpha + res_B$firth_delta + B_covid)
+    B_se_delta  = res_B$se_delta
   )
 
   if (!split_only) {
@@ -885,7 +870,7 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
   }
 
   # Derived quantities
-  prefixes <- if (split_only) c("true", "B", "B_firth") else c("true", "A", "B", "C", "B_firth")
+  prefixes <- if (split_only) c("true", "B") else c("true", "A", "B", "C")
   for (prefix in prefixes) {
     p0_col  <- paste0(prefix, "_p0")
     p1_col  <- paste0(prefix, "_p1")
@@ -954,7 +939,8 @@ compute_hyperparams <- function(results, split_only = FALSE) {
         rmse_delta = sqrt(mean(err^2)),
         mu_rrr     = rs$mu,
         rrr_mae    = rs$mae,
-        rrr_rmse   = rs$rmse
+        rrr_rmse   = rs$rmse,
+        rrr_rep    = NA_real_
       )
     }
   }
@@ -979,7 +965,8 @@ compute_hyperparams <- function(results, split_only = FALSE) {
         rmse_delta = sqrt(mean(err^2)),
         mu_rrr     = NA_real_,
         rrr_mae    = NA_real_,
-        rrr_rmse   = NA_real_
+        rrr_rmse   = NA_real_,
+        rrr_rep    = NA_real_
       )
     }
   }
@@ -1024,6 +1011,24 @@ compute_hyperparams <- function(results, split_only = FALSE) {
         rrr_rmse_dl <- sqrt(mean(rrr_err^2))
       }
 
+      # Representative-school RRR: evaluate at (mu_alpha, mu_delta_DL)
+      # Avoids Jensen's inequality by not averaging nonlinear school-level RRRs
+      rrr_rep    <- NA_real_
+      has_raw_a  <- "B_raw_alpha" %in% names(results)
+      has_bp0    <- "B_p0" %in% names(results)
+      if (has_raw_a && has_bp0 && grp != "Overall") {
+        raw_a    <- results[["B_raw_alpha"]][idx]
+        mu_alpha <- sum(w_re * raw_a) / sum(w_re)
+
+        j1       <- idx[1]
+        b_base   <- qlogis(results[["B_p0"]][j1]) - results[["B_alpha"]][j1]
+        b_covid  <- qlogis(results[["B_p1"]][j1]) - results[["B_alpha"]][j1] - results[["B_delta"]][j1]
+
+        p0_rep   <- plogis(mu_alpha + b_base)
+        p1_rep   <- plogis(mu_alpha + mu_dl + b_covid)
+        rrr_rep  <- (p1_rep - p0_rep) / (1 - p0_rep)
+      }
+
       hp_list[[length(hp_list) + 1L]] <- data.table(
         group      = grp,
         estimator  = "B_DL",
@@ -1033,81 +1038,8 @@ compute_hyperparams <- function(results, split_only = FALSE) {
         rmse_delta = sqrt(mean(err^2)),
         mu_rrr     = mu_rrr_dl,
         rrr_mae    = rrr_mae_dl,
-        rrr_rmse   = rrr_rmse_dl
-      )
-    }
-  }
-
-  # Firth bias-corrected delta — simple sample moments + RRR
-  firth_col <- "B_firth_delta"
-  if (firth_col %in% names(results)) {
-    firth_vals <- results[[firth_col]]
-    for (grp in c("Overall", "State", "Academy", "Independent")) {
-      idx <- if (grp == "Overall") seq_len(nrow(results))
-             else which(results$school_type == grp)
-      vals  <- firth_vals[idx]
-      tvals <- true_delta[idx]
-      err   <- vals - tvals
-      rs    <- rrr_stats(idx, "B_firth_rrr")
-
-      hp_list[[length(hp_list) + 1L]] <- data.table(
-        group      = grp,
-        estimator  = "B_Firth",
-        mu_delta   = mean(vals),
-        tau2_delta = var(vals),
-        mae_delta  = mean(abs(err)),
-        rmse_delta = sqrt(mean(err^2)),
-        mu_rrr     = rs$mu,
-        rrr_mae    = rs$mae,
-        rrr_rmse   = rs$rmse
-      )
-    }
-  }
-
-  # Firth + DerSimonian-Laird: DL on Firth-corrected deltas
-  if (firth_col %in% names(results) && se_col %in% names(results)) {
-    firth_vals <- results[[firth_col]]
-    se_vals    <- results[[se_col]]
-    has_frrr   <- "B_firth_rrr" %in% names(results)
-    for (grp in c("Overall", "State", "Academy", "Independent")) {
-      idx <- if (grp == "Overall") seq_len(nrow(results))
-             else which(results$school_type == grp)
-      d_j   <- firth_vals[idx]
-      se_j  <- se_vals[idx]
-      tvals <- true_delta[idx]
-      k     <- length(d_j)
-
-      w_fe  <- 1 / se_j^2
-      mu_fe <- sum(w_fe * d_j) / sum(w_fe)
-      Q     <- sum(w_fe * (d_j - mu_fe)^2)
-      c_dl  <- sum(w_fe) - sum(w_fe^2) / sum(w_fe)
-      tau2  <- max(0, (Q - (k - 1)) / c_dl)
-      w_re  <- 1 / (se_j^2 + tau2)
-      mu_dl <- sum(w_re * d_j) / sum(w_re)
-      err   <- d_j - tvals
-
-      mu_rrr_fdl  <- NA_real_
-      rrr_mae_fdl <- NA_real_
-      rrr_rmse_fdl <- NA_real_
-      if (has_frrr) {
-        est_rrr <- results[["B_firth_rrr"]][idx]
-        tru_rrr <- true_rrr[idx]
-        mu_rrr_fdl  <- sum(w_re * est_rrr) / sum(w_re)
-        rrr_err     <- est_rrr - tru_rrr
-        rrr_mae_fdl <- mean(abs(rrr_err))
-        rrr_rmse_fdl <- sqrt(mean(rrr_err^2))
-      }
-
-      hp_list[[length(hp_list) + 1L]] <- data.table(
-        group      = grp,
-        estimator  = "B_Firth_DL",
-        mu_delta   = mu_dl,
-        tau2_delta = tau2,
-        mae_delta  = mean(abs(err)),
-        rmse_delta = sqrt(mean(err^2)),
-        mu_rrr     = mu_rrr_fdl,
-        rrr_mae    = rrr_mae_fdl,
-        rrr_rmse   = rrr_rmse_fdl
+        rrr_rmse   = rrr_rmse_dl,
+        rrr_rep    = rrr_rep
       )
     }
   }

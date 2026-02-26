@@ -181,7 +181,7 @@ if (!is.null(true_rrr_hp)) {
 }
 
 # --- Report by group and estimator ---
-report_ests <- if (SPLIT_ONLY) c("B_Split", "B_Firth", "B_DL", "B_Firth_DL") else c("A_Global", "B_Split", "C_Fix", "B_Firth", "B_DL", "B_Firth_DL")
+report_ests <- if (SPLIT_ONLY) c("B_Split", "B_DL") else c("A_Global", "B_Split", "C_Fix", "B_DL")
 for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("--- %s ---\n", grp))
 
@@ -231,6 +231,14 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
                   rrr_mean, rrr_sd, rrr_bias))
       cat(sprintf("    RRR MAE:    mean=%.4f  sd=%.4f\n", rrr_mae_m, rrr_mae_s))
       cat(sprintf("    RRR RMSE:   mean=%.4f  sd=%.4f\n", rrr_rmse_m, rrr_rmse_s))
+    }
+    if ("rrr_rep" %in% names(sub) && !all(is.na(sub$rrr_rep)) && !is.null(true_rrr_hp)) {
+      trrr       <- true_rrr_hp[group == grp]$mu_rrr
+      rep_mean   <- mean(sub$rrr_rep)
+      rep_sd     <- sd(sub$rrr_rep)
+      rep_bias   <- rep_mean - trrr
+      cat(sprintf("    RRR (rep):  mean=%.4f  sd=%.4f  bias=%+.4f  (at DL mean alpha/delta)\n",
+                  rep_mean, rep_sd, rep_bias))
     }
   }
   cat("\n")
