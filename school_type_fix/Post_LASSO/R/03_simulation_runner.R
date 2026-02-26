@@ -152,7 +152,7 @@ n_valid <- length(hp_list)
 cat(sprintf("Valid replications: %d / %d\n\n", n_valid, N_REPS))
 
 # --- Report by group and estimator ---
-report_ests <- if (SPLIT_ONLY) "B_Split" else c("A_Global", "B_Split", "C_Fix")
+report_ests <- if (SPLIT_ONLY) c("B_Split", "B_Raw") else c("A_Global", "B_Split", "C_Fix", "B_Raw")
 for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("--- %s ---\n", grp))
 

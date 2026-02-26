@@ -341,9 +341,11 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
   J <- nrow(school_dt)
   student_type <- school_dt$school_type[sid]
 
-  eb_alpha_all <- numeric(J)
-  eb_delta_all <- numeric(J)
-  fit_list     <- list()
+  eb_alpha_all  <- numeric(J)
+  eb_delta_all  <- numeric(J)
+  raw_alpha_all <- numeric(J)
+  raw_delta_all <- numeric(J)
+  fit_list      <- list()
 
   for (stype in c("State", "Academy", "Independent")) {
     cat(sprintf("      %s: ", stype))
@@ -367,8 +369,10 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
     eb_d <- eb_shrink(fit_s$delta, se_s$se_delta, tau2_floor = 0.02)
 
     # Map back to global school IDs
-    eb_alpha_all[s_orig_ids] <- eb_a
-    eb_delta_all[s_orig_ids] <- eb_d
+    eb_alpha_all[s_orig_ids]  <- eb_a
+    eb_delta_all[s_orig_ids]  <- eb_d
+    raw_alpha_all[s_orig_ids] <- fit_s$alpha
+    raw_delta_all[s_orig_ids] <- fit_s$delta
 
     fit_list[[stype]] <- list(fit = fit_s, se = se_s,
                                eb_alpha = eb_a, eb_delta = eb_d,
@@ -376,7 +380,9 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
   }
 
   cat(sprintf("    [B] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
-  list(eb_alpha = eb_alpha_all, eb_delta = eb_delta_all, fits = fit_list)
+  list(eb_alpha = eb_alpha_all, eb_delta = eb_delta_all,
+       raw_alpha = raw_alpha_all, raw_delta = raw_delta_all,
+       fits = fit_list)
 }
 
 
@@ -632,11 +638,15 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     true_p0  = plogis(school_dt$alpha_j + true_base),
     true_p1  = plogis(school_dt$alpha_j + school_dt$delta_alpha_j + true_covid),
 
-    # Estimator B (Split)
+    # Estimator B (Split) — EB-shrunk
     B_alpha = res_B$eb_alpha,
     B_delta = res_B$eb_delta,
     B_p0    = plogis(res_B$eb_alpha + B_base),
-    B_p1    = plogis(res_B$eb_alpha + res_B$eb_delta + B_covid)
+    B_p1    = plogis(res_B$eb_alpha + res_B$eb_delta + B_covid),
+
+    # Estimator B (Split) — raw (unshrunk)
+    B_raw_alpha = res_B$raw_alpha,
+    B_raw_delta = res_B$raw_delta
   )
 
   if (!split_only) {
@@ -705,12 +715,15 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
 # 8. COMPUTE HYPERPARAMETERS AND SCHOOL-LEVEL AGGREGATE ERROR
 # ==============================================================================
 # split_only: if TRUE, only compute for B_Split
+# Reports both EB-shrunk and raw (unshrunk) delta hyperparameters.
 # School-level metrics: MAE (mean |est - true|), RMSE (sqrt(mean (est-true)^2))
 compute_hyperparams <- function(results, split_only = FALSE) {
   hp_list <- list()
+  true_delta <- results$true_delta
+
+  # EB-shrunk estimators
   ests <- if (split_only) "B" else c("A", "B", "C")
   est_labels <- c(A = "A_Global", B = "B_Split", C = "C_Fix")
-  true_delta <- results$true_delta
 
   for (est in ests) {
     est_label <- est_labels[[est]]
@@ -738,6 +751,31 @@ compute_hyperparams <- function(results, split_only = FALSE) {
       )
     }
   }
+
+  # Raw (unshrunk) delta — B_Split only
+  raw_col <- "B_raw_delta"
+  if (raw_col %in% names(results)) {
+    raw_vals <- results[[raw_col]]
+    for (grp in c("Overall", "State", "Academy", "Independent")) {
+      idx <- if (grp == "Overall") seq_len(nrow(results))
+             else which(results$school_type == grp)
+      vals   <- raw_vals[idx]
+      tvals  <- true_delta[idx]
+      err    <- vals - tvals
+      mae    <- mean(abs(err))
+      rmse   <- sqrt(mean(err^2))
+
+      hp_list[[length(hp_list) + 1L]] <- data.table(
+        group      = grp,
+        estimator  = "B_Raw",
+        mu_delta   = mean(vals),
+        tau2_delta = var(vals),
+        mae_delta  = mae,
+        rmse_delta = rmse
+      )
+    }
+  }
+
   rbindlist(hp_list)
 }
 
