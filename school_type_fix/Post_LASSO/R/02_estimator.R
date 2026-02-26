@@ -345,6 +345,7 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
   eb_delta_all  <- numeric(J)
   raw_alpha_all <- numeric(J)
   raw_delta_all <- numeric(J)
+  se_delta_all  <- numeric(J)
   fit_list      <- list()
 
   for (stype in c("State", "Academy", "Independent")) {
@@ -373,6 +374,7 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
     eb_delta_all[s_orig_ids]  <- eb_d
     raw_alpha_all[s_orig_ids] <- fit_s$alpha
     raw_delta_all[s_orig_ids] <- fit_s$delta
+    se_delta_all[s_orig_ids]  <- se_s$se_delta
 
     fit_list[[stype]] <- list(fit = fit_s, se = se_s,
                                eb_alpha = eb_a, eb_delta = eb_d,
@@ -382,7 +384,7 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
   cat(sprintf("    [B] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
   list(eb_alpha = eb_alpha_all, eb_delta = eb_delta_all,
        raw_alpha = raw_alpha_all, raw_delta = raw_delta_all,
-       fits = fit_list)
+       se_delta = se_delta_all, fits = fit_list)
 }
 
 
@@ -644,9 +646,10 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
     B_p0    = plogis(res_B$eb_alpha + B_base),
     B_p1    = plogis(res_B$eb_alpha + res_B$eb_delta + B_covid),
 
-    # Estimator B (Split) — raw (unshrunk)
+    # Estimator B (Split) — raw (unshrunk) and standard errors
     B_raw_alpha = res_B$raw_alpha,
-    B_raw_delta = res_B$raw_delta
+    B_raw_delta = res_B$raw_delta,
+    B_se_delta  = res_B$se_delta
   )
 
   if (!split_only) {
@@ -770,6 +773,45 @@ compute_hyperparams <- function(results, split_only = FALSE) {
         estimator  = "B_Raw",
         mu_delta   = mean(vals),
         tau2_delta = var(vals),
+        mae_delta  = mae,
+        rmse_delta = rmse
+      )
+    }
+  }
+
+  # DerSimonian-Laird estimator — uses raw deltas and their SEs
+  se_col <- "B_se_delta"
+  if (raw_col %in% names(results) && se_col %in% names(results)) {
+    raw_vals <- results[[raw_col]]
+    se_vals  <- results[[se_col]]
+    for (grp in c("Overall", "State", "Academy", "Independent")) {
+      idx <- if (grp == "Overall") seq_len(nrow(results))
+             else which(results$school_type == grp)
+      d_j   <- raw_vals[idx]
+      se_j  <- se_vals[idx]
+      tvals <- true_delta[idx]
+      k     <- length(d_j)
+
+      # Step 1: tau2 via DL (Cochran's Q)
+      w_fe  <- 1 / se_j^2
+      mu_fe <- sum(w_fe * d_j) / sum(w_fe)
+      Q     <- sum(w_fe * (d_j - mu_fe)^2)
+      c_dl  <- sum(w_fe) - sum(w_fe^2) / sum(w_fe)
+      tau2  <- max(0, (Q - (k - 1)) / c_dl)
+
+      # Step 2: mu via precision-weighted mean
+      w_re  <- 1 / (se_j^2 + tau2)
+      mu_dl <- sum(w_re * d_j) / sum(w_re)
+
+      err   <- d_j - tvals
+      mae   <- mean(abs(err))
+      rmse  <- sqrt(mean(err^2))
+
+      hp_list[[length(hp_list) + 1L]] <- data.table(
+        group      = grp,
+        estimator  = "B_DL",
+        mu_delta   = mu_dl,
+        tau2_delta = tau2,
         mae_delta  = mae,
         rmse_delta = rmse
       )
