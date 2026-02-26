@@ -930,6 +930,24 @@ compute_hyperparams <- function(results, split_only = FALSE) {
       err    <- vals - tvals
       rs     <- rrr_stats(idx, rrr_col)
 
+      # Representative-school RRR at group mean alpha/delta
+      this_rrr_rep <- NA_real_
+      alpha_col <- paste0(est, "_alpha")
+      p0_col    <- paste0(est, "_p0")
+      p1_col    <- paste0(est, "_p1")
+      if (grp != "Overall" &&
+          all(c(alpha_col, delta_col, p0_col, p1_col) %in% names(results))) {
+        est_a     <- results[[alpha_col]][idx]
+        mu_a      <- mean(est_a)
+        mu_d      <- mean(vals)
+        j1        <- idx[1]
+        b_base    <- qlogis(results[[p0_col]][j1]) - results[[alpha_col]][j1]
+        b_covid   <- qlogis(results[[p1_col]][j1]) - results[[alpha_col]][j1] - results[[delta_col]][j1]
+        p0_rep    <- plogis(mu_a + b_base)
+        p1_rep    <- plogis(mu_a + mu_d + b_covid)
+        this_rrr_rep <- (p1_rep - p0_rep) / (1 - p0_rep)
+      }
+
       hp_list[[length(hp_list) + 1L]] <- data.table(
         group      = grp,
         estimator  = est_label,
@@ -940,7 +958,7 @@ compute_hyperparams <- function(results, split_only = FALSE) {
         mu_rrr     = rs$mu,
         rrr_mae    = rs$mae,
         rrr_rmse   = rs$rmse,
-        rrr_rep    = NA_real_
+        rrr_rep    = this_rrr_rep
       )
     }
   }

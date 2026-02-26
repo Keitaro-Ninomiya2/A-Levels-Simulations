@@ -165,11 +165,21 @@ for (r in seq_len(N_REPS)) {
   }
   if (is.list(res_r) && "true_rrr" %in% names(res_r$results)) {
     rr <- res_r$results
-    true_rrr_hp <- data.table(group = "Overall", mu_rrr = mean(rr$true_rrr))
+    true_rrr_hp <- data.table(group = "Overall",
+                              mu_rrr = mean(rr$true_rrr), rrr_rep = NA_real_)
     for (stype in c("State", "Academy", "Independent")) {
       idx_s <- which(rr$school_type == stype)
+      mu_a  <- mean(rr$true_alpha[idx_s])
+      mu_d  <- mean(rr$true_delta[idx_s])
+      j1    <- idx_s[1]
+      b_b   <- qlogis(rr$true_p0[j1]) - rr$true_alpha[j1]
+      b_c   <- qlogis(rr$true_p1[j1]) - rr$true_alpha[j1] - rr$true_delta[j1]
+      p0r   <- plogis(mu_a + b_b)
+      p1r   <- plogis(mu_a + mu_d + b_c)
       true_rrr_hp <- rbind(true_rrr_hp,
-                           data.table(group = stype, mu_rrr = mean(rr$true_rrr[idx_s])))
+                           data.table(group = stype,
+                                      mu_rrr = mean(rr$true_rrr[idx_s]),
+                                      rrr_rep = (p1r - p0r) / (1 - p0r)))
     }
     break
   }
@@ -181,7 +191,7 @@ if (!is.null(true_rrr_hp)) {
 }
 
 # --- Report by group and estimator ---
-report_ests <- if (SPLIT_ONLY) c("B_Split", "B_DL") else c("A_Global", "B_Split", "C_Fix", "B_DL")
+report_ests <- if (SPLIT_ONLY) c("B_Split") else c("A_Global", "B_Split", "C_Fix")
 for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("--- %s ---\n", grp))
 
@@ -190,8 +200,9 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
   cat(sprintf("  True:  mu_delta = %.4f,  tau2_delta = %.4f",
               true_row$mu_delta, true_row$tau2_delta))
   if (!is.null(true_rrr_hp)) {
-    trrr <- true_rrr_hp[group == grp]$mu_rrr
-    cat(sprintf(",  mu_rrr = %.4f", trrr))
+    trow <- true_rrr_hp[group == grp]
+    cat(sprintf(",  mu_rrr = %.4f", trow$mu_rrr))
+    if (!is.na(trow$rrr_rep)) cat(sprintf(",  rrr_rep = %.4f", trow$rrr_rep))
   }
   cat("\n")
 
@@ -233,11 +244,12 @@ for (grp in c("Overall", "State", "Academy", "Independent")) {
       cat(sprintf("    RRR RMSE:   mean=%.4f  sd=%.4f\n", rrr_rmse_m, rrr_rmse_s))
     }
     if ("rrr_rep" %in% names(sub) && !all(is.na(sub$rrr_rep)) && !is.null(true_rrr_hp)) {
-      trrr       <- true_rrr_hp[group == grp]$mu_rrr
+      trow       <- true_rrr_hp[group == grp]
+      true_rep   <- if (!is.na(trow$rrr_rep)) trow$rrr_rep else trow$mu_rrr
       rep_mean   <- mean(sub$rrr_rep)
       rep_sd     <- sd(sub$rrr_rep)
-      rep_bias   <- rep_mean - trrr
-      cat(sprintf("    RRR (rep):  mean=%.4f  sd=%.4f  bias=%+.4f  (at DL mean alpha/delta)\n",
+      rep_bias   <- rep_mean - true_rep
+      cat(sprintf("    RRR (rep):  mean=%.4f  sd=%.4f  bias=%+.4f  (at group mean alpha/delta)\n",
                   rep_mean, rep_sd, rep_bias))
     }
   }
