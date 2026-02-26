@@ -288,16 +288,18 @@ compute_block_se <- function(sid, d_covid, Z_base, fit,
 
 
 # ==============================================================================
-# 3. EMPIRICAL BAYES SHRINKAGE
+# 3. EMPIRICAL BAYES SHRINKAGE (type-specific, relaxed)
 # ==============================================================================
-eb_shrink <- function(est, se, verbose = FALSE) {
+# tau2_floor: minimum between-unit variance to prevent full collapse to mean.
+#   When var(est) - mean(SE^2) < 0, standard EB sets tau2=0 and shrinks all
+#   to the mean. A floor (e.g. 0.02) preserves some heterogeneity.
+eb_shrink <- function(est, se, verbose = FALSE, tau2_floor = 0.02) {
   mu   <- mean(est)
   V    <- se^2
-  tau2 <- max(0, var(est) - mean(V))
+  tau2 <- max(tau2_floor, var(est) - mean(V))
   if (verbose)
     cat(sprintf("      EB: var(est)=%.4f, mean(SE^2)=%.4f, tau2=%.4f\n",
                 var(est), mean(V), tau2))
-  if (tau2 < 1e-12) return(rep(mu, length(est)))
   B  <- tau2 / (tau2 + V)
   (1 - B) * mu + B * est
 }
@@ -306,15 +308,23 @@ eb_shrink <- function(est, se, verbose = FALSE) {
 # ==============================================================================
 # 4. ESTIMATOR A: Global Model (common slopes — misspecified)
 # ==============================================================================
-fit_global <- function(sid, d_covid, Z_base, y, cov_names) {
+# Type-specific EB shrinkage so Independent/Academy aren't shrunk toward grand mean.
+fit_global <- function(sid, d_covid, Z_base, y, cov_names, school_dt) {
   cat("    [A] Global model (common slopes)...\n")
   t0 <- proc.time()
 
+  J <- nrow(school_dt)
   fit <- sparse_block_irls(sid, d_covid, Z_base, y, use_covid_cov = TRUE)
   se  <- compute_block_se(sid, d_covid, Z_base, fit,
                           use_covid_cov = TRUE, ridge = 0)
-  eb_alpha <- eb_shrink(fit$alpha, se$se_alpha)
-  eb_delta <- eb_shrink(fit$delta, se$se_delta)
+
+  eb_alpha <- numeric(J)
+  eb_delta <- numeric(J)
+  for (stype in c("State", "Academy", "Independent")) {
+    idx <- which(school_dt$school_type == stype)
+    eb_alpha[idx] <- eb_shrink(fit$alpha[idx], se$se_alpha[idx], tau2_floor = 0.02)
+    eb_delta[idx] <- eb_shrink(fit$delta[idx], se$se_delta[idx], tau2_floor = 0.02)
+  }
 
   cat(sprintf("    [A] Done [%.1fs]\n", (proc.time() - t0)["elapsed"]))
   list(fit = fit, eb_alpha = eb_alpha, eb_delta = eb_delta, se = se)
@@ -353,8 +363,8 @@ fit_split <- function(sid, d_covid, Z_base, y, school_dt, cov_names) {
     fit_s <- sparse_block_irls(s_sid, s_dcov, s_Z, s_y, use_covid_cov = TRUE)
     se_s  <- compute_block_se(s_sid, s_dcov, s_Z, fit_s,
                               use_covid_cov = TRUE, ridge = 0)
-    eb_a <- eb_shrink(fit_s$alpha, se_s$se_alpha)
-    eb_d <- eb_shrink(fit_s$delta, se_s$se_delta)
+    eb_a <- eb_shrink(fit_s$alpha, se_s$se_alpha, tau2_floor = 0.02)
+    eb_d <- eb_shrink(fit_s$delta, se_s$se_delta, tau2_floor = 0.02)
 
     # Map back to global school IDs
     eb_alpha_all[s_orig_ids] <- eb_a
@@ -518,14 +528,13 @@ fit_typed_lasso <- function(sid, d_covid, Z_base, y, school_dt,
   # SE and EB
   se_post <- compute_block_se(sid, d_covid, Z_post, fit_post,
                               use_covid_cov = TRUE, ridge = 0)
-  # Type-specific EB shrinkage: shrink within each school type to avoid
-  # cross-type contamination (Independent alphas >> grand mean)
+  # Type-specific EB shrinkage with tau2 floor to avoid full collapse
   eb_alpha <- numeric(J)
   eb_delta <- numeric(J)
   for (stype in c("State", "Academy", "Independent")) {
     idx <- which(school_dt$school_type == stype)
-    eb_alpha[idx] <- eb_shrink(fit_post$alpha[idx], se_post$se_alpha[idx])
-    eb_delta[idx] <- eb_shrink(fit_post$delta[idx], se_post$se_delta[idx])
+    eb_alpha[idx] <- eb_shrink(fit_post$alpha[idx], se_post$se_alpha[idx], tau2_floor = 0.02)
+    eb_delta[idx] <- eb_shrink(fit_post$delta[idx], se_post$se_delta[idx], tau2_floor = 0.02)
   }
 
   # Extract type interaction coefficients from post-LASSO
@@ -748,7 +757,7 @@ estimate_all <- function(panel, school_dt, params) {
               J, p, format(length(y), big.mark = ",")))
 
   # --- Estimator A: Global ---
-  res_A <- fit_global(sid, d_covid, Z_base, y, cov_names)
+  res_A <- fit_global(sid, d_covid, Z_base, y, cov_names, school_dt)
 
   # --- Estimator B: Split by Type ---
   res_B <- fit_split(sid, d_covid, Z_base, y, school_dt, cov_names)

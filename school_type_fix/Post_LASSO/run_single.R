@@ -76,8 +76,13 @@ time_A <- (proc.time() - t0)["elapsed"]
 
 se_A <- compute_block_se(sid, d_covid, Z_base, fit_A,
                          use_covid_cov = TRUE, ridge = 0)
-eb_alpha_A <- eb_shrink(fit_A$alpha, se_A$se_alpha, verbose = TRUE)
-eb_delta_A <- eb_shrink(fit_A$delta, se_A$se_delta, verbose = TRUE)
+eb_alpha_A <- numeric(J)
+eb_delta_A <- numeric(J)
+for (stype in c("State", "Academy", "Independent")) {
+  idx <- which(school_dt$school_type == stype)
+  eb_alpha_A[idx] <- eb_shrink(fit_A$alpha[idx], se_A$se_alpha[idx], tau2_floor = 0.02)
+  eb_delta_A[idx] <- eb_shrink(fit_A$delta[idx], se_A$se_delta[idx], tau2_floor = 0.02)
+}
 cat(sprintf("    Time: %.1fs\n\n", time_A))
 
 
@@ -109,8 +114,8 @@ for (stype in c("State", "Academy", "Independent")) {
   fit_s <- sparse_block_irls(s_sid, s_dcov, s_Z, s_y, use_covid_cov = TRUE)
   se_s  <- compute_block_se(s_sid, s_dcov, s_Z, fit_s,
                             use_covid_cov = TRUE, ridge = 0)
-  eb_a <- eb_shrink(fit_s$alpha, se_s$se_alpha)
-  eb_d <- eb_shrink(fit_s$delta, se_s$se_delta)
+  eb_a <- eb_shrink(fit_s$alpha, se_s$se_alpha, tau2_floor = 0.02)
+  eb_d <- eb_shrink(fit_s$delta, se_s$se_delta, tau2_floor = 0.02)
 
   eb_alpha_B[s_orig_ids] <- eb_a
   eb_delta_B[s_orig_ids] <- eb_d
@@ -266,8 +271,8 @@ eb_alpha_C <- numeric(J)
 eb_delta_C <- numeric(J)
 for (stype in c("State", "Academy", "Independent")) {
   idx <- which(school_dt$school_type == stype)
-  eb_alpha_C[idx] <- eb_shrink(alpha_C[idx], se_C$se_alpha[idx])
-  eb_delta_C[idx] <- eb_shrink(delta_C[idx], se_C$se_delta[idx])
+  eb_alpha_C[idx] <- eb_shrink(alpha_C[idx], se_C$se_alpha[idx], tau2_floor = 0.02)
+  eb_delta_C[idx] <- eb_shrink(delta_C[idx], se_C$se_delta[idx], tau2_floor = 0.02)
 }
 
 # Extract type interaction coefficients from post-LASSO
