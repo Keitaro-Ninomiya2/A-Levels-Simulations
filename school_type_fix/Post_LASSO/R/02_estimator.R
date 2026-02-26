@@ -701,7 +701,32 @@ compute_rrr <- function(school_dt, params, res_A, res_B, res_C,
 
 
 # ==============================================================================
-# 8. ORCHESTRATOR
+# 8. COMPUTE HYPERPARAMETERS FROM EB DELTAS
+# ==============================================================================
+compute_hyperparams <- function(results) {
+  hp_list <- list()
+  for (est in c("A", "B", "C")) {
+    est_label <- c(A = "A_Global", B = "B_Split", C = "C_Fix")[[est]]
+    delta_col <- paste0(est, "_delta")
+
+    for (grp in c("Overall", "State", "Academy", "Independent")) {
+      idx <- if (grp == "Overall") seq_len(nrow(results))
+             else which(results$school_type == grp)
+      vals <- results[[delta_col]][idx]
+      hp_list[[length(hp_list) + 1L]] <- data.table(
+        group      = grp,
+        estimator  = est_label,
+        mu_delta   = mean(vals),
+        tau2_delta = var(vals)
+      )
+    }
+  }
+  rbindlist(hp_list)
+}
+
+
+# ==============================================================================
+# 9. ORCHESTRATOR
 # ==============================================================================
 estimate_all <- function(panel, school_dt, params) {
   J         <- nrow(school_dt)
@@ -736,8 +761,11 @@ estimate_all <- function(panel, school_dt, params) {
   results <- compute_rrr(school_dt, params, res_A, res_B, res_C,
                          sid, d_covid, Z_base, col_means)
 
+  # --- Compute hyperparameters ---
+  hyperparams <- compute_hyperparams(results)
+
   rm(Z_base, sid, d_covid, y)
   gc(verbose = FALSE)
 
-  results
+  list(results = results, hyperparams = hyperparams)
 }

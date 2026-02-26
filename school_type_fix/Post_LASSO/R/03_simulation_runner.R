@@ -71,10 +71,9 @@ cat("\n")
 run_one <- function(r) {
   rep_file <- file.path(OUT_DIR, sprintf("rep_%03d.rds", r))
 
-  # Checkpoint: if this rep was already completed, reload and skip computation
   if (file.exists(rep_file)) {
     saved <- tryCatch(readRDS(rep_file), error = function(e) NULL)
-    if (!is.null(saved) && !is.null(saved$hyperparams)) {
+    if (is.list(saved) && !is.null(saved$hyperparams)) {
       cat(sprintf("  Rep %d: loaded from checkpoint.\n", r))
       return(saved)
     }
@@ -94,9 +93,8 @@ run_one <- function(r) {
     return(NULL)
   })
 
-  if (!is.null(out)) {
+  if (is.list(out) && !is.null(out$results)) {
     out$results[, rep_id := r]
-    # Save the FULL out object (results + hyperparams) so checkpointing works
     saveRDS(out, rep_file)
     cat(sprintf("  Rep %d saved.\n", r))
   }
@@ -127,16 +125,16 @@ cat("====================================================================\n\n")
 hp_list <- list()
 for (r in seq_len(N_REPS)) {
   res_r <- all_results[[r]]
-  if (is.null(res_r) || is.null(res_r$hyperparams)) {
+  if (!is.list(res_r) || is.null(res_r$hyperparams)) {
     rep_file <- file.path(OUT_DIR, sprintf("rep_%03d.rds", r))
     if (file.exists(rep_file)) {
       res_r <- tryCatch(readRDS(rep_file), error = function(e) NULL)
     }
   }
-  if (!is.null(res_r) && !is.null(res_r$hyperparams)) {
-    hp_r <- res_r$hyperparams
+  if (is.list(res_r) && !is.null(res_r$hyperparams)) {
+    hp_r <- copy(res_r$hyperparams)
     hp_r[, rep_id := r]
-    hp_list[[r]] <- hp_r
+    hp_list[[length(hp_list) + 1L]] <- hp_r
   }
 }
 hp_all <- rbindlist(hp_list)

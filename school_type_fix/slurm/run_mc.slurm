@@ -31,6 +31,9 @@ export OPENBLAS_NUM_THREADS=1
 export BLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
+mkdir -p /u/keitaro2/A-Levels/school_type_fix/slurm/logs
+mkdir -p /u/keitaro2/A-Levels/school_type_fix/output/results
+
 echo "========================================"
 echo " Monte Carlo: grade inflation hyperparams"
 echo " Job ID : $SLURM_JOB_ID"
@@ -40,6 +43,10 @@ echo " Started: $(date)"
 echo "========================================"
 
 cd /u/keitaro2/A-Levels/school_type_fix
+
+# Clear old-format checkpoint files (pre-hyperparams fix)
+echo "Clearing stale checkpoint files..."
+rm -f output/results/rep_*.rds
 
 Rscript Post_LASSO/R/03_simulation_runner.R \
   --reps  50 \
