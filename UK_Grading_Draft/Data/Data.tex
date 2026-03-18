@@ -1,0 +1,20 @@
+
+I use administrative data on university application in the UK (UCAS) to recover the grade distribution of students with detailed demographic information of the students and basic attributes of schools.
+
+%Coverage
+The UCAS data includes the A-level grade that applicants submitted to the university, as well as the student background information.  As UCAS is the single centralized clearing house of university applications in the UK, UCAS handles the content of the application, including the A-level grades as well the other qualification that the applicant submits including their GCSE scores, their AS level scores, and third party qualifications as the International Baccalaureate. In addition to the qualifications, applicants also submit their background demographics information such as their gender, race, socio economic status, and the income deprivation index scores of their residential area.  Students also submit their school of attendance in addition to the governance type of the school. My dataset covers 2007 to 2021.
+
+The UCAS dataset covers a wide range of qualifications, including the grades that universities use for filtering applicants into acceptance, as well as the record of the applicants past qualifications. Many universities in the UK request basic academic certifications from their applicants despite not using the results of the past qualification for deciding the reply to the applicants. 
+
+Despite some universities and students match outside of the UCAS system, a majority of students use the UCAS system to apply to universities. The UCAS system also manages the match between foreign students and British universities. As many British universities accept the use of internationally recognized standardized exam as certificates for acceptance, the UCAS data also includes applications from foreign applicants as well as their demographics and their grades in the foreign exams. 
+
+Lastly, the UCAS data also includes application related information, namely their firm/insurance choice, as well as their acceptance. 
+
+%Data Cleaning: I remove non-A-level entries
+%I construct the database after removing the applicants with non-A-levels qualifications. Table [] reports the characteristics of the applicants that uses non-A-level qualifications to secure a placement at universities. I also remove the students that reported their A-levels that was taken before the year of their application. 
+
+%Data Cleaning: I remove small schools
+%Additionally, I select schools with more than 30 students in taking the A-level exams in two of the pandemic years. The removal of other data reduces the sample size by [] percent. Table reports how the sample selection mentioned above cuts down the sample size. 
+
+%Sample Selection
+Although the UCAS data covers the entire university applicant that used UCAS to apply to university, their coverage is not comprehensive of the entire A-levels exam outcome as a subset of students do not apply to university, therefore the students grade is missing from the UCAS data. 

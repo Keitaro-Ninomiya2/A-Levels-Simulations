@@ -1,0 +1,120 @@
+% requires: \usepackage{booktabs,threeparttable,array}
+\setlength{\tabcolsep}{6pt} % a little more breathing room
+\begin{table}[htbp]
+\centering
+\label{tab:Demographics}
+\caption{Treatment interaction estimates by demographic groups}
+\small
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.0}
+% adjust these widths if you want (label col, numeric cols)
+\newcommand{\labw}{5.2cm}   % label column
+\newcommand{\numw}{1.7cm}  % each numeric column (six of them)
+
+\begin{tabular}{p{\labw} *{6}{>{\centering\arraybackslash}p{\numw}}}
+\toprule
+ & \multicolumn{2}{c}{\textbf{A}} 
+ & \multicolumn{2}{c}{\textbf{A*}} 
+ & \multicolumn{2}{c}{\textbf{B}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & (1) & (2) & (3) & (4) & (5) & (6) \\
+\midrule
+
+\multicolumn{7}{l}{\textbf{Panel B: POLAR Quintiles (ref: Quintile 5)}}\\
+Quintile 1 & 0.019 & -0.003 & 0.064\textsuperscript{***} & 0.032\textsuperscript{*} & 0.030 & 0.003 \\
+ & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.019)} & \multicolumn{1}{c}{(0.017)} & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.027)} & \multicolumn{1}{c}{(0.028)} \\
+
+Quintile 2 & 0.036\textsuperscript{**} & -0.003 & 0.066\textsuperscript{***} & 0.020 & 0.033 & 0.004 \\
+ & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.015)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.021)} & \multicolumn{1}{c}{(0.022)} \\
+
+Quintile 3 & \multicolumn{1}{c}{--} & 0.021 & 0.037\textsuperscript{***} & 0.023 & 0.041\textsuperscript{**} & 0.013 \\
+ &  & \multicolumn{1}{c}{(0.015)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.015)} & \multicolumn{1}{c}{(0.019)} & \multicolumn{1}{c}{(0.020)} \\
+
+Quintile 4 & -0.019 & 0.015 & 0.018 & 0.032\textsuperscript{*} & -0.020 & 0.001 \\
+ & \multicolumn{1}{c}{(0.017)} & \multicolumn{1}{c}{(0.017)} & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.022)} & \multicolumn{1}{c}{(0.022)} \\
+
+\addlinespace
+
+\multicolumn{7}{l}{\textbf{Panel C: IMD Quintiles (ref: Quintile 5)}}\\
+Quintile 1 & 0.013 & -0.081 & -0.014 & -0.091 & 0.041 & -0.046 \\
+ & \multicolumn{1}{c}{(0.015)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.015)} & \multicolumn{1}{c}{(0.022)} & \multicolumn{1}{c}{(0.024)} \\
+
+Quintile 2 & 0.008 & -0.066 & -0.026 & -0.058 & 0.061 & -0.033 \\
+ & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.019)} & \multicolumn{1}{c}{(0.020)} \\
+
+Quintile 3 & 0.018 & -0.040 & -0.024 & -0.033 & 0.039 & -0.020 \\
+ & \multicolumn{1}{c}{(0.013)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.018)} \\
+
+Quintile 4 & 0.010 & -0.035 & -0.011 & -0.049 & 0.021 & -0.007 \\
+ & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.017)} & \multicolumn{1}{c}{(0.017)} & \multicolumn{1}{c}{(0.020)} & \multicolumn{1}{c}{(0.020)} \\
+
+
+\multicolumn{7}{l}{\textbf{Panel A: Gender}}\\[4pt]
+Female $\times$ Treat
+ & 0.055\textsuperscript{***} & 0.069\textsuperscript{***} 
+ & 0.041\textsuperscript{***} & 0.062\textsuperscript{***}
+ & 0.063\textsuperscript{***} & 0.079\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.003)} & \multicolumn{1}{c}{(0.003)}
+ & \multicolumn{1}{c}{(0.004)} & \multicolumn{1}{c}{(0.004)}
+ & \multicolumn{1}{c}{(0.003)} & \multicolumn{1}{c}{(0.003)} \\
+
+\addlinespace
+\multicolumn{7}{l}{\textbf{Panel B: Ethnicity (ref: White)}}\\[4pt]
+Asian
+ & -0.037\textsuperscript{***} & 0.040\textsuperscript{***}
+ & -0.082\textsuperscript{***} & 0.031
+ & -0.034\textsuperscript{**} & 0.005 \\
+ & \multicolumn{1}{c}{(0.013)} & \multicolumn{1}{c}{(0.014)}
+ & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.019)}
+ & \multicolumn{1}{c}{(0.013)} & \multicolumn{1}{c}{(0.014)} \\
+
+Black
+ & -0.004 & -0.024
+ & -0.018 & -0.026
+ & -0.067\textsuperscript{***} & -0.073\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.020)} & \multicolumn{1}{c}{(0.021)}
+ & \multicolumn{1}{c}{(0.032)} & \multicolumn{1}{c}{(0.034)}
+ & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.019)} \\
+
+Mixed
+ & -0.029 & -0.063\textsuperscript{***}
+ & -0.063\textsuperscript{**} & -0.066\textsuperscript{**}
+ & -0.048\textsuperscript{**} & -0.077\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.019)} & \multicolumn{1}{c}{(0.020)}
+ & \multicolumn{1}{c}{(0.026)} & \multicolumn{1}{c}{(0.026)}
+ & \multicolumn{1}{c}{(0.020)} & \multicolumn{1}{c}{(0.020)} \\
+
+Other
+ & 0.005 & 0.053
+ & 0.048 & 0.127\textsuperscript{***}
+ & -0.015 & 0.006 \\
+ & \multicolumn{1}{c}{(0.031)} & \multicolumn{1}{c}{(0.033)}
+ & \multicolumn{1}{c}{(0.045)} & \multicolumn{1}{c}{(0.047)}
+ & \multicolumn{1}{c}{(0.030)} & \multicolumn{1}{c}{(0.031)} \\
+
+Unknown / Prefer not to say
+ & 0.069\textsuperscript{*} & -0.065\textsuperscript{*}
+ & 0.243\textsuperscript{***} & 0.109\textsuperscript{**}
+ & -0.037 & -0.082\textsuperscript{*} \\
+ & \multicolumn{1}{c}{(0.037)} & \multicolumn{1}{c}{(0.037)}
+ & \multicolumn{1}{c}{(0.043)} & \multicolumn{1}{c}{(0.043)}
+ & \multicolumn{1}{c}{(0.041)} & \multicolumn{1}{c}{(0.042)} \\
+
+
+\midrule
+Year & 2020 & 2021 & 2020 & 2021 & 2020 & 2021 \\
+Number of Obs. & 2,802,651 & 2,802,651 & 2,802,651 & 2,802,651 & 2,802,651 & 2,802,651 \\
+\midrule
+
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item[]
+  \begin{minipage}{\linewidth}
+    \raggedright
+    Notes: Columns (1)-(2)=A, (3)-(4)=AS, (5)-(6)=B. Entries are coefficients; standard errors are in parentheses. 
+    Significance: \textsuperscript{*} $p<0.10$, \textsuperscript{**} $p<0.05$, \textsuperscript{***} $p<0.01$. Baseline level and fixed effects omitted.
+  \end{minipage}
+\end{tablenotes}
+
+\end{threeparttable}
+\end{table}

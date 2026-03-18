@@ -1,0 +1,23 @@
+
+\begin{table}[htbp]\centering
+\caption{Regression results: Improvements in placements by school quality}
+\begin{tabular}{lcc|cc}
+\toprule
+ & (1) & (2) & (3) & (4) \\
+\midrule
+School Quality & -0.067\textsuperscript{*} & -0.171\textsuperscript{***} & 0.086\textsuperscript{*} & -0.049 \\
+               & (0.040) & (0.036) & (0.052) & (0.048) \\
+\midrule
+Year & 2020 & 2021 & 2020 & 2021 \\
+Num. Obs.      & 1,878 & 1,881 & 1,878 & 1,881 \\
+Uni FE         &  &  & X & X \\
+School FE      &  &  & X & X \\
+Tariff         &  &  & X & X \\ 
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+\footnotesize{Notes: Standard errors in parentheses. ${}^{*}p<0.10$, ${}^{**}p<0.05$, ${}^{***}p<0.01$. $\delta$ is the (estimated) logit coefficient and $SQ$ denotes the coefficient for the school fixed effect from a seperate grade regression.}
+\label{tab:placement_main}
+\end{table}
+

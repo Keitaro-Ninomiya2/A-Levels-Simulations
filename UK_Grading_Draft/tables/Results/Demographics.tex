@@ -1,0 +1,69 @@
+% requires: \usepackage{booktabs,threeparttable,array}
+\setlength{\tabcolsep}{6pt} % a little more breathing room
+\begin{table}[htbp]
+\centering
+\caption{Grade inflation by demographic groups}
+\small                % larger than \scriptsize but still compact
+\begin{threeparttable}
+\renewcommand{\arraystretch}{1.06}
+% adjust these widths if you want (label col, numeric cols)
+\newcommand{\labw}{7.0cm}   % label column
+\newcommand{\numw}{1.45cm}  % each numeric column (six of them)
+
+\begin{tabular}{p{\labw} *{6}{>{\centering\arraybackslash}p{\numw}}}
+\toprule
+ & \multicolumn{2}{c}{\textbf{A}} 
+ & \multicolumn{2}{c}{\textbf{A*}} 
+ & \multicolumn{2}{c}{\textbf{B}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & (1) & (2) & (3) & (4) & (5) & (6) \\
+\midrule
+
+\multicolumn{7}{l}{\textbf{SES (ref. Elementary occupations.)}}\\[4pt]
+
+Managers, directors and senior officials
+ & 0.190\textsuperscript{***} & 0.011 & 0.171\textsuperscript{***} & 0.149\textsuperscript{***} & 0.177\textsuperscript{***} & 0.150\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.013)} & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.014)} & \multicolumn{1}{c}{(0.017)} \\
+
+Professional occupations
+ & 0.173\textsuperscript{***} & 0.024 & 0.134\textsuperscript{***} & 0.105\textsuperscript{***} & 0.181\textsuperscript{***} & 0.128\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.018)} & \multicolumn{1}{c}{(0.023)} & \multicolumn{1}{c}{(0.029)} \\
+
+Associate professional and technical
+ & 0.190\textsuperscript{***} & 0.032 & 0.179\textsuperscript{***} & 0.135\textsuperscript{***} & 0.267\textsuperscript{***} & 0.168\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.022)} & \multicolumn{1}{c}{(0.022)} & \multicolumn{1}{c}{(0.034)} & \multicolumn{1}{c}{(0.035)} \\
+
+Administrative and secretarial
+ & 0.161\textsuperscript{***} & -0.016 & 0.166\textsuperscript{***} & 0.087\textsuperscript{***} & 0.178\textsuperscript{***} & 0.028 \\
+ & \multicolumn{1}{c}{(0.019)} & \multicolumn{1}{c}{(0.020)} & \multicolumn{1}{c}{(0.028)} & \multicolumn{1}{c}{(0.013)} & \multicolumn{1}{c}{(0.042)} & \multicolumn{1}{c}{(0.015)} \\
+
+Skilled trades occupations
+ & 0.264\textsuperscript{***} & 0.028 & 0.075\textsuperscript{***} & 0.054\textsuperscript{***} & 0.064\textsuperscript{***} & 0.069\textsuperscript{***} \\
+ & \multicolumn{1}{c}{(0.023)} & \multicolumn{1}{c}{(0.024)} & \multicolumn{1}{c}{(0.012)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.016)} & \multicolumn{1}{c}{(0.023)} \\
+
+Caring, leisure and other service occupations
+ & 0.175\textsuperscript{***} & -0.029 & 0.021 & 0.046\textsuperscript{*} & 0.039 & 0.048 \\
+ & \multicolumn{1}{c}{(0.023)} & \multicolumn{1}{c}{(0.023)} & \multicolumn{1}{c}{(0.019)} & \multicolumn{1}{c}{(0.023)} & \multicolumn{1}{c}{(0.028)} & \multicolumn{1}{c}{(0.034)} \\
+
+Sales and customer service occupations
+ & 0.206\textsuperscript{***} & -0.019 & 0.002 & 0.029 & 0.017 & 0.040 \\
+ & \multicolumn{1}{c}{(0.029)} & \multicolumn{1}{c}{(0.028)} & \multicolumn{1}{c}{(0.022)} & \multicolumn{1}{c}{(0.028)} & \multicolumn{1}{c}{(0.033)} & \multicolumn{1}{c}{(0.039)} \\
+
+\addlinespace
+
+\midrule
+Year & 2020 & 2021 & 2020 & 2021 & 2020 & 2021 \\
+Number of Obs. & 2,802,651 & 2,802,651 & 2,802,651 & 2,802,651 & 2,802,651 & 2,802,651 \\
+\midrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item[]
+\noindent\begin{minipage}{\textwidth}
+\footnotesize
+\textbf{Notes:} The table reports the regression coefficient that regresses the inflation measure defined in \Cref{eq:main} on the measure of school quality, the school type dummy variable, and the interaction of the two variables. Degree of inflation is measured as the average marginal effect (AME) at the school level, in which I calculates the average marginal effect of the school inflation for all students within the school. Namely, the latent scores of each students without the inflation effects are calculated by mapping the student attributes on the fixed effect coefficient in \Cref{eq:main}. Before the AME is calculated, I apply the shrinkage correction method by \cite{b933f52e-83fe-34bb-bf19-f7f3e5459001}.School quality is defined as the fixed effect derived from \Cref{eq:main}. The school fixed effect is evaluated by calculating the probability of obtaining A or A* for the nationally representative student, which I define as the student with median values in their continuous or categorical variables. School fixed effects are corrected for the incidental parameter bias by using methods by \cite{FERNANDEZVAL2016291}
+. Schools without less than 30 students in both 2020 and 2021 taking A-level exams are dropped from the regression. Column 1 and 2 uses A, Column 3 and 4 uses A*, and Column 5 and 6 uses B as the binary dependent variable for estimating \Cref{eq:main}.  Bootstrapped standard errors at obtained by blocking at the school level. + $p<0.1$, * $p<0.05$, ** $p<0.01$, *** $p<0.001$.
+\end{minipage}
+\end{tablenotes}
+
+\end{threeparttable}
+\end{table}

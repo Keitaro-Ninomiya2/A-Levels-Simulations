@@ -1,0 +1,90 @@
+\subsection{Theory}
+\noindent\textbf{Setup.} A school has two student types: good (G) and mediocre (M). There are two possible states: favorable \(F\) (fraction \(\phi_F\) of G) with prior \(\pi\), and unfavorable \(U\) (fraction \(\phi_U<\phi_F\)). The school privately observes student types and chooses a grading policy that results either in ``easy'' grading \(e\) (A given to fraction \(\phi_F\)) or ``tough'' grading \(t\) (A given to fraction \(\phi_U\)). Employers observe only the grade outcome (and which grading outcome the school used) and assign entry jobs: high job \(H\) (productivity \(\omega_G\) if type G, \(\omega_M\) if type M) or low job \(L\) (productivity \(\omega_0\), same for both types). Assume \(\omega_G>\omega_0>\omega_M\) and learning is faster in \(H\) than \(L\). (Model and notation follow Chan et\,al. 2007.) :contentReference[oaicite:3]{index=3}
+
+\medskip
+\noindent\textbf{Single-school semi-pooling equilibrium.}  
+Suppose that in state \(F\) the school chooses \(e\) for sure; in state \(U\) it randomizes and chooses \(e\) with probability \(p\). Employers observing \(e\) form the posterior probability that the state is \(F\):
+\begin{equation}
+q(F\mid e)\;=\;\frac{\pi}{\pi+(1-\pi)p}. \label{eq:qFe}
+\end{equation}
+When the market interprets \(e\) as coming from a favorable state with prob.\ \(q(F\mid e)\), the expected (entry) productivity of an A-student when \(e\) is observed is
+\begin{equation}
+w(A\mid e)\;=\;q(F\mid e)\,\omega_G+(1-q(F\mid e))\,\bar\omega,
+\qquad
+\bar\omega \;=\; \frac{\phi_U}{\phi_F}\omega_G+\Big(1-\frac{\phi_U}{\phi_F}\Big)\omega_M. \label{eq:wA}
+\end{equation}
+Indifference of the school in state \(U\) between choosing \(e\) and \(t\) equates the (short-run) cost of diluting A’s with the (short-run) benefit of getting some M’s into job \(H\). This reduces to the simple condition
+\begin{equation}
+q(F\mid e)\;=\;\gamma,\qquad
+\gamma\equiv\frac{\omega_0-\omega_M}{\omega_G-\omega_M}, \label{eq:qgamma}
+\end{equation}
+i.e. the posterior probability of \(F\) when \(e\) is observed must equal \(\gamma\). (See Chan et\,al., Prop.\ 1.) :contentReference[oaicite:4]{index=4}
+
+Substitute (\ref{eq:qFe}) into (\ref{eq:qgamma}) and solve for \(p\):
+\[
+\frac{\pi}{\pi+(1-\pi)p}=\gamma
+\quad\Longrightarrow\quad
+p^*=\frac{\pi}{1-\pi}\cdot\frac{1-\gamma}{\gamma}.
+\]
+Replacing \(1-\gamma=(\omega_G-\omega_0)/(\omega_G-\omega_M)\) gives the closed form
+\begin{equation}
+p^* \;=\; \frac{\pi}{1-\pi}\cdot\frac{\omega_G-\omega_0}{\omega_0-\omega_M}. \label{eq:pstar}
+\end{equation}
+An interior semi-pooling solution \(p^*\in(0,1)\) exists iff \(\pi<\gamma\); if \(\pi\ge\gamma\) the model admits a pooling equilibrium with \(p=1\). (Chan et\,al., Prop.\ 1–2.) :contentReference[oaicite:5]{index=5}
+
+\medskip
+\noindent\textbf{Comparative statics (single school).} From (\ref{eq:pstar}) we have: \(p^*\) rises with \(\omega_G\) and with \(\omega_M\) (both make placing M’s into \(H\) more attractive) and falls with \(\omega_0\) (which reduces the gain from shifting people to \(H\)). Also \(p^*\) increases with \(\pi\). (See Chan et\,al., Sec.\ 3.1.) :contentReference[oaicite:6]{index=6}
+
+\medskip
+\noindent\textbf{Two schools (heterogeneous tendency via correlation).}  
+For two schools 1 and 2 with symmetric priors and correlation parameter \(z=\Pr[F_j\mid F_i]\in[0,1]\), the posterior beliefs that matter are (Chan et\,al., Eq.\ (14)):
+\begin{align}
+q(F_1\mid e_1,e_2) &= \frac{\tfrac12 z + \tfrac12(1-z)p_2}{\tfrac12 z + \tfrac12(1-z)(p_1+p_2)+\tfrac12 z p_1 p_2}, 
+\quad
+q(F_1\mid e_1,t_2)=\frac{\tfrac12(1-z)}{\tfrac12(1-z)+\tfrac12 z p_1}. \label{eq:q14}
+\end{align}
+In the symmetric case \(p_1=p_2=p\) the indifference condition for school 1 becomes
+\begin{equation}
+k(p)\;=\;\gamma,\qquad
+k(p) \;=\; (1-z+zp)\,q(F_1\mid e_1,e_2) + z(1-p)\,q(F_1\mid e_1,t_2). \label{eq:kp}
+\end{equation}
+Thus, the equilibrium probability of inflating in each school is the root \(p\) of \(k(p)=\gamma\). Because \(k(\cdot)\) depends on \(z\), correlation across schools alters the incentives: when \(z\) is near 1 the function \(k(p)\) can be non-monotone and multiple equilibria can arise (strategic complementarity and contagion); when \(z\le\frac12\) the semi-pooling equilibrium (if it exists) is unique. See Chan et\,al. Sec.\ 4 and Figure 1 for illustration. :contentReference[oaicite:7]{index=7}
+
+\medskip
+\noindent\textbf{Interpretation for empirical appendix.} Equations (\ref{eq:pstar}) and (\ref{eq:kp}) provide a compact linkage from primitives \((\pi,\omega_G,\omega_0,\omega_M,z)\) to schools' propensities to inflate. In particular:
+\begin{itemize}
+  \item Single-school: equation (\ref{eq:pstar}) gives a direct mapping; higher \(\pi\), higher \(\omega_G\) (or \(\omega_M\)) imply larger \(p^*\).
+  \item Multi-school: correlation \(z\) shifts the \(k\)-function and can make easy grading strategic complements (positive feedback across schools) or substitutes; this produces heterogeneous empirical tendencies across schools and possible multiple equilibria. 
+\end{itemize}
+
+\noindent\textit{References.} For full proofs, comparative statics, and the two-school algebra, see Chan, W., L. Hao, and W. Suen (2007), \textit{A Signaling Theory of Grade Inflation}, \emph{International Economic Review}. :contentReference[oaicite:9]{index=9}
+
+\subsection{Estimating Conditional Average Treatment Effects for public schools}
+
+I further investigate the impact of the treatment across the distribution of public school students by considering two school types, denoted \(i \in \{Public, Private\}\). Let \(X_i\) represent the characteristics of students in school type \(i\). For each school type, I estimate a logit model of the form
+\[
+\Pr(Y=1 \mid X_i, c) = \Phi\Bigl(c\alpha_i + \beta_i X_i + b_i\Bigr),
+\]
+where \(c=1\) in the treatment year (e.g., the COVID-19 period) and \(c=0\) otherwise.
+
+The school-level treatment effect for an observation with covariate value \(x\) in school type \(i\) is given by
+\[
+\Delta_i(x)=\Phi\Bigl(\alpha_i+\beta_i x+b_i\Bigr)-\Phi\Bigl(\beta_i x+b_i\Bigr),
+\]
+which represents the increase in the passing probability due to the treatment.
+
+To capture how this effect varies across the distribution of students, let \(\psi_i(x)\) denote the percentile rank of \(\beta_i x\) in the distribution of \(\beta_iX_i\) for school type \(i\). I define \(\phi(y)\) as the density of a normal distribution used as a kernel, centered at a target percentile \(m\) (with \(m\in [0.1,0.9]\)); the standard deviation \(\sigma\) of this kernel is adjusted so that smoothing is reduced near the boundaries of the distribution.
+
+The conditional average treatment effect (CATE) for students in the \(m\)th percentile of school type \(i\) is then computed as
+\[
+\Delta_i(m) = \int \phi\bigl(\psi_i(x)\bigr)\,\Delta_i(x)\,dx.
+\]
+Furthermore, I assess a counterfactual scenario by estimating the hypothetical treatment effect for students in the \(m\)th percentile of school type \(i\) if they had attended school type \(j\) (with \(j\neq i\)):
+\[
+\Delta_{i\to j}(m) = \int \phi\bigl(\psi_i(x)\bigr)\,\Delta_j(x)\,dx.
+\]
+
+These integrals, evaluated numerically, yield the conditional average treatment effects across the distribution of students for each school type as well as the counterfactual effects of attending an alternative school type.
+
+
+I compare the conditional estimate of grade inflation between schools between 2020 and 2021. Using Equation (2), I estimate the increments in probability of receiving A or A* relative to baseline years ($\Phi(\text{School}_j, T_{2020}|X), \Phi(\text{School}_j, T_{2021}|X)$).

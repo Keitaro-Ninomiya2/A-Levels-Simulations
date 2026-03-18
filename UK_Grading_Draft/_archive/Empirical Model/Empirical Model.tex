@@ -1,0 +1,186 @@
+\subsection{Baseline Empirical Model}
+I identify the pattern of grade changes across students using an interrupted time series model. I assume that the unpredictability of the pandemic and its occurrence at the very end of the university application cycle allow me to identify the school's assignment of grades rather than the disruptions of learning experiences caused by the pandemic. The distribution of grades is fitted with the following binary choice model to quantify the impact of the change in the grade method on the final grades.
+\setlength{\abovedisplayskip}{0.2cm}
+\setlength{\belowdisplayskip}{0.2cm}
+
+\begin{equation}
+    Y_{i,j,k,t} =  1\{Y^*_{i,j,k,t} \geq 0\}
+\end{equation}
+\begin{flalign*}
+Y^*_{i,j,k,t} =  & \beta\text{Year}2020_t +  \left(\sum_k \theta_k^\prime Subject_k + \sum \delta_l^\prime GCSE_{i,l,t} + \sum \beta_i^\prime X_i + \sum \beta_j^\prime X_j\right) \times \text{Year}2020_t \\
+ & + \sum_l \delta_l GCSE_{i,l,t} + \sum \beta_i X_i + \sum \beta_j School_j + \sum_k \theta_k Subject_k + \epsilon_{i,j,l,k}
+\end{flalign*}
+\begin{equation*}
+    \epsilon_{i,j,l,k} \sim N(\mu_j, \sigma_j) 
+\end{equation*}
+
+
+I set the unit observations at the exam level to capture the heterogeneity across subject categories. $Y_{i,j,k,t}$ measures whether students ($i$) received an A or $A^*$ for their final grade of school $j$ with their subject of A levels $k$ at time $t$. A-levels assign a letter grade from 7 bins based on the student score on the exam. I choose to measure the result using a binary approach rather than a continuous approach\footnote{I defer discussions on to the next paragraph}. $Subject_k$ denotes a dummy variable that turn on to 1 if and only if the student took subject $k$. $\theta_k$ estimates the differences across subjects regarding school's leniency to assign a higher grade. $GCSE_{i,l,t}$ denotes a saturated variable that turns to 1 if the student's GCSE grade for subject $l$ falls into a grade bin. I include only the mandatory subjects into the regression(i.e. English Literature, English Language, and Mathematics) into the regression, as other subject choice may correlated with unobserved attributes of the school or student. The GCSE assigns an interval between 1 and 9 based on the student's numeric score. $X_i$ denotes the student level information such as race, gender, and social economic status. $X_j$ denotes the school level information such as school quality, type of school, and demographics. $\text{Year}2020_t$ denotes a time indicator variable that turns on to 1 for year 2020. $\text{GCSE}_{i,l,t}$, $\text{Subject}_k$, and $\text{School}_j$ denote GCSE score fixed effect, subject fixed effect, and school fixed effect, respectively. I specify the error term to follow a normal distribution with unknown error and variance. 
+
+The probit model accounts for different difficulties across students and schools regards to obtaining a top grade. Since the method change lead to a significant degree of grade inflation, a linear probability model will likely predict probabilities well out of the $[0, 1]$ range. To regulate coefficients to stay within the probability range, I choose to estimate a binary choice model that transforms the predicted values into plausible probability terms. 
+
+I account for the heteroskedastic error by letting it vary across years. Unlike the OLS, a conventional probit model assigns a common variance structure on the variancem which is troublesome in my set up. The pandemic dispersed the grade distribution significantly. Alvarez and Brehm (1995) show that probit models can account for heteroskedastic error terms. 
+
+\subsection{Discussion of assumptions}
+To identify the causal effect of the grade method change, I establish that the probability in obtaining A/$A^*$ remains constant until the pandemic year. Figure [] reports the coefficients of the event study. I find that the difference between the average grade between 2019 and all the preceeding years are mostly not different from each other. I find a significant jump in the year of 2020 when the grading method was changed. 
+
+
+\subsection{Bayesian Hierchical model}
+I augment equation (1) with a school specific indicator variable to capture the remaining variation in grading across schools, which are not captured by the school level control variables. 
+
+\begin{equation}
+    Y_{i,j,k,t} =  1\{Y^*_{i,j,k,t} \geq 0\}
+\end{equation}
+\begin{flalign*}
+Y^*_{i,j,k,t} =  & \beta\text{Year}2020_t +  \left(\sum_k \theta_k^\prime Subject_k + \sum \delta_l^\prime GCSE_{i,l,t} + \sum \beta_i^\prime X_i + \sum \beta_j^\prime X_j + \sum_j\Tilde{\beta}_j\text{School}_j\right) \times \text{Year}2020_t \\
+ & + \sum_l \delta_l GCSE_{i,l,t} + \sum \beta_i X_i + \sum \beta_j School_j + \sum_k \theta_k Subject_k + \epsilon_{i,j,l,k}
+\end{flalign*}
+\begin{equation*}
+    \epsilon_{i,j,l,k} \sim N(\mu_j, \sigma_j) 
+\end{equation*}
+However, the number of parameters in the model increases significantly after including school level dummy variable, leading to inefficient estimate of the school level parameters and an significant increase in computational burden. Approximately 4000 secondary schools exists in the UK, and since I estimate the grade distribution using 200,000 observations per a year the computational burden using a maximum likelihood criteria without closed form solutions is infeasible. In addition, a maximum likelihood criteria for calculating the school level parameters imposes each parameter to be calculated from the students that took A-levels in 2020. Such a restriction introduces a lot of noise into many school level parameters since the cohorts size is limited for some schools. A Bayesian hierchical model (Gelman et al 2013) improves the efficiency of groups with smaller number of samples by pooling the estimates of each schools together with some distributional assumption to improve the efficiency of each school level estimate. To avoid estimates with the majority of underlying distribution accruing from the pooled estimates, I bin/discard schools with less than students into a single category. 
+
+\subsection{Censoring model}
+A shortcoming of a binary choice model is that the dependent variable may not capture the movements of grades for schools or students with high or low underlying grades. Although I control for the student's GCSE grades, some school attributes, and students attributes, the final grades of students may be influenced by unobserved factors which assigns different scores on the students latent variable distribution. To account for the difference in distance to the latent threshold, I propose two alternations to the binary model, namely extending the dependent variable to a continuous distribution, or allowing the model to have different latent score threshold.
+
+\subsubsection{An Orderred Probit Approach}
+The Ordered Probit Model is used when the dependent variable \( y_i \) takes on **ordered categorical values**. The structure of the model is as follows:
+
+There exists an unobserved latent variable \( y_i^* \), which is a linear function of the covariates:
+\[
+y_i^* = x_i^\top \bm{\beta} + \varepsilon_i, \quad \varepsilon_i \sim N(0, 1),
+\]
+where:
+\begin{itemize}
+    \item \( y_i^* \) is the latent continuous variable,
+    \item \( x_i \) is a vector of covariates for individual \( i \),
+    \item \( \bm{\beta} \) is a vector of coefficients,
+    \item \( \varepsilon_i \) is an error term, assumed to follow a standard normal distribution.
+\end{itemize}
+
+The observed categorical outcome \( y_i \) is determined by the latent variable \( y_i^* \) crossing certain thresholds \( \tau_j \), where \( \tau_1 < \tau_2 < \dots < \tau_{J-1} \). Specifically:
+\[
+y_i =
+\begin{cases}
+0 & \text{if } y_i^* \leq \tau_1, \\
+1 & \text{if } \tau_1 < y_i^* \leq \tau_2, \\
+2 & \text{if } \tau_2 < y_i^* \leq \tau_3, \\
+\vdots & \vdots \\
+J & \text{if } y_i^* > \tau_{J-1}.
+\end{cases}
+\]
+
+Here:
+\begin{itemize}
+    \item \( \tau_j \) are the unknown thresholds (cutoffs) that divide the latent space into categories,
+    \item \( J \) is the total number of categories.
+\end{itemize}
+
+The probability of observing each category \( y_i = j \) is given by:
+\[
+P(y_i = j | x_i) =
+\begin{cases}
+\Phi(\tau_1 - x_i^\top \bm{\beta}) & \text{if } j = 0, \\
+\Phi(\tau_j - x_i^\top \bm{\beta}) - \Phi(\tau_{j-1} - x_i^\top \bm{\beta}) & \text{if } 1 \leq j \leq J-1, \\
+1 - \Phi(\tau_{J-1} - x_i^\top \bm{\beta}) & \text{if } j = J.
+\end{cases}
+\]
+where \( \Phi(\cdot) \) is the **cumulative distribution function (CDF)** of the standard normal distribution.
+
+The log-likelihood function for the ordered probit model is:
+\[
+\ell(\bm{\beta}, \bm{\tau}) = \sum_{i=1}^N \sum_{j=0}^J \mathbbm{1}(y_i = j) \cdot \ln P(y_i = j | x_i),
+\]
+where:
+\begin{itemize}
+    \item \( \mathbbm{1}(y_i = j) \) is an indicator function that equals 1 if \( y_i = j \),
+    \item \( P(y_i = j | x_i) \) is the probability of observing category \( j \) for individual \( i \).
+\end{itemize}
+
+\subsubsection{Tobit/CLAD Approach}
+The Tobit model assumes the following latent variable structure:
+\[
+y_i^* = x_i \beta + \varepsilon_i, \quad \varepsilon_i \sim N(0, \sigma^2),
+\]
+where \( y_i^* \) is the latent variable, \( x_i \) is a vector of covariates, \( \beta \) is the parameter vector, and \( \varepsilon_i \) is a normally distributed error term.
+
+The observed variable \( y_i \) is censored at \( c \) (left-censoring case):
+\[
+y_i = 
+\begin{cases}
+c & \text{if } y_i^* \leq c, \\
+y_i^* & \text{if } y_i^* > c.
+\end{cases}
+\]
+
+The likelihood function for the Tobit model combines two parts:
+1. The probability of being censored \( (y_i = c) \).
+2. The probability of observing \( y_i > c \).
+
+The likelihood function can be written as:
+\[
+L(\beta, \sigma) = \prod_{i \in C} \Phi\left( \frac{c - x_i \beta}{\sigma} \right) 
+\prod_{i \in U} \frac{1}{\sigma} \phi\left( \frac{y_i - x_i \beta}{\sigma} \right),
+\]
+where:
+\begin{itemize}
+    \item \( C \): Set of observations that are censored (\( y_i = c \)),
+    \item \( U \): Set of uncensored observations (\( y_i > c \)),
+    \item \( \Phi(\cdot) \): Cumulative distribution function (CDF) of the standard normal distribution,
+    \item \( \phi(\cdot) \): Probability density function (PDF) of the standard normal distribution.
+\end{itemize}
+
+Taking the natural logarithm, the log-likelihood function becomes:
+\[
+\ell(\beta, \sigma) = \sum_{i \in C} \ln \left[ \Phi\left( \frac{c - x_i \beta}{\sigma} \right) \right]
++ \sum_{i \in U} \left[ -\ln(\sigma) + \ln \phi\left( \frac{y_i - x_i \beta}{\sigma} \right) \right].
+\]
+
+The parameters \( \beta \) and \( \sigma \) are estimated by maximizing the log-likelihood function.
+
+\subsubsection{Generalized Probit Approach}
+In a generalized probit model with group-specific latent cutoffs, the structure of the model can be written as follows:
+The underlying latent variable \( y_{ig}^* \) for observation \( i \) in group \( g \) is defined as:
+\[
+y_{ig}^* = x_{ig}^\top \bm{\beta} + \varepsilon_{ig}, \quad \varepsilon_{ig} \sim N(0, \sigma^2),
+\]
+where:
+\begin{itemize}
+    \item \( y_{ig}^* \) is the unobserved (latent) continuous outcome,
+    \item \( x_{ig} \) is a vector of covariates for individual \( i \) in group \( g \),
+    \item \( \bm{\beta} \) is a vector of coefficients,
+    \item \( \varepsilon_{ig} \) is a normally distributed error term with mean 0 and variance \( \sigma^2 \).
+\end{itemize}
+
+The observed outcome \( y_{ig} \) depends on a group-specific latent cutoff \( \tau_g \), such that:
+\[
+y_{ig} = 
+\begin{cases}
+1 & \text{if } y_{ig}^* > \tau_g, \\
+0 & \text{if } y_{ig}^* \leq \tau_g.
+\end{cases}
+\]
+
+The cutoff \( \tau_g \) can vary by group \( g \), capturing heterogeneity across groups. For example, the cutoff could be modeled as:
+\[
+\tau_g = z_g^\top \bm{\gamma},
+\]
+where:
+\begin{itemize}
+    \item \( z_g \) is a vector of group-level covariates,
+    \item \( \bm{\gamma} \) is a vector of coefficients determining the cutoff.
+\end{itemize}
+
+The probability of observing \( y_{ig} = 1 \) (success) is given by:
+\[
+P(y_{ig} = 1 | x_{ig}, z_g) = P(y_{ig}^* > \tau_g) = 1 - \Phi\left( \frac{\tau_g - x_{ig}^\top \bm{\beta}}{\sigma} \right),
+\]
+where \( \Phi(\cdot) \) is the cumulative distribution function (CDF) of the standard normal distribution.
+
+The log-likelihood for the generalized probit model with group-specific cutoffs is:
+\[
+\ell(\bm{\beta}, \bm{\gamma}, \sigma) = \sum_{g} \sum_{i \in g} \left[
+y_{ig} \ln \left( 1 - \Phi\left( \frac{\tau_g - x_{ig}^\top \bm{\beta}}{\sigma} \right) \right) 
++ (1 - y_{ig}) \ln \left( \Phi\left( \frac{\tau_g - x_{ig}^\top \bm{\beta}}{\sigma} \right) \right)
+\right].
+\]

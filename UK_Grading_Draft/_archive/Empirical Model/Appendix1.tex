@@ -1,0 +1,33 @@
+Thus, the probability of observing \(Y=1\) is
+\[
+\Pr(Y=1 \mid X) \;=\; \Phi\bigl(X\beta\bigr),
+\]
+where \(\Phi(\cdot)\) is the standard normal cumulative distribution function.
+
+The sample log-likelihood is given by
+\[
+\ell_Y(\beta)
+\;=\;
+\sum_{i=1}^n \left[
+Y_{i}\,\ln \Phi\!\bigl(X_i\beta\bigr)
+\;+\;
+(1-Y_{i})\,\ln \Bigl(1-\Phi\!\bigl(X_i\beta\bigr)\Bigr)
+\right].
+\]
+Maximizing this log-likelihood with respect to \(\beta\) yields the maximum likelihood estimates \(\hat{\beta}\).
+
+\bigskip
+\noindent
+\textbf{Grade Inflation.} I define school-level grade inflation as the change in the predicted probability of achieving an \(A\) (or \(A^*\)) between the baseline period and the treatment year (2020), holding other covariates at a reference level \(\overline{X}\). For school \(j\), the inflation factor \(\theta_j\) is computed as
+\[
+\theta_j \;=\;
+\Pr\bigl(Y=1 \mid \text{Year2020}=1,\text{School}=j,\overline{X}\bigr)
+\;-\;
+\Pr\bigl(Y=1 \mid \text{Year2020}=0,\text{School}=j,\overline{X}\bigr).
+\]
+In the context of my logit model, these probabilities are evaluated as
+\[
+\Pr(Y=1 \mid X) \;=\; \Phi\Bigl( X\hat{\beta} \Bigr).
+\]
+
+As I estimate the school level treatment effect $\{\delta_j\}_{j=1}^{4000}$ using a ridge regression. Estimates of the school level treatment effects obtained through standard maximum likelihood algorithms exhibit high variance (Appendix []). 

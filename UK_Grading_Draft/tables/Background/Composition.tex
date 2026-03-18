@@ -1,0 +1,89 @@
+% In preamble (or right above the table)
+\newcommand{\paneltitle}[1]{\par\smallskip{\centering \textbf{#1}\par}\vspace{2pt}}
+\newcommand{\pA}{Female Share} \newcommand{\pB}{High Math score share} \newcommand{\pC}{High income parent} \newcommand{\pD}{Independent school share} % --------------------------------------
+\begin{table}[htbp]
+\centering
+\caption{Selectivity and Mean demographics}
+\label{tab:stacked_panels}
+\scriptsize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{0.98}
+\begin{threeparttable}
+
+% ===================== Panel A =====================
+\paneltitle{Panel A. \pA}
+\makebox[\textwidth][c]{%
+\begin{tabular}{lccc}
+\toprule
+ & (1) & (2) & (3) \\
+\midrule
+AcceptRate19  & 0.046*   & 0.002    & 0.041*   \\
+              & (0.019)  & (0.019)  & (0.019)  \\
+\midrule
+Num. Obs.     & 6443 & 6026 & 5708 \\
+R$^2$         & 0.001 & 0.000 & 0.001 \\
+\bottomrule
+\end{tabular}
+}
+
+\vspace{8pt}
+
+% ===================== Panel B =====================
+\paneltitle{Panel B. \pB}
+\makebox[\textwidth][c]{%
+\begin{tabular}{lccc}
+\toprule
+ & (1) & (2) & (3) \\
+\midrule
+AcceptRate19  & 0.325*** & 0.170*** & 0.197*** \\
+              & (0.018)  & (0.019)  & (0.020)  \\
+\midrule
+Num. Obs.     & 6443 & 6026 & 5708 \\
+R$^2$         & 0.050 & 0.014 & 0.017 \\
+\bottomrule
+\end{tabular}
+}
+
+\vspace{8pt}
+
+% ===================== Panel C =====================
+\paneltitle{Panel C. \pC}
+\makebox[\textwidth][c]{%
+\begin{tabular}{lccc}
+\toprule
+ & (1) & (2) & (3) \\
+\midrule
+AcceptRate19  & 0.039*** & -0.004   & 0.000 \\
+              & (0.005)  & (0.005)  & (0.005)  \\
+\midrule
+Num. Obs.     & 18901 & 16981 & 15982 \\
+R$^2$         & 0.004 & 0.000 & 0.000 \\
+\bottomrule
+\end{tabular}
+}
+
+\vspace{8pt}
+
+% ===================== Panel D =====================
+\paneltitle{Panel D. \pD}
+\makebox[\textwidth][c]{%
+\begin{tabular}{lccc}
+\toprule
+ & (1) & (2) & (3) \\
+\midrule
+AcceptRate19  & 0.202*** & 0.149*** & 0.149*** \\
+              & (0.007)  & (0.007)  & (0.007)  \\
+\midrule
+Num. Obs.     & 18901 & 16981 & 15982 \\
+R$^2$         & 0.047 & 0.026 & 0.026 \\
+\bottomrule
+\end{tabular}
+}
+
+\begin{tablenotes}
+\footnotesize
+\item Notes: Standard errors in parentheses. + $p<0.1$, * $p<0.05$, ** $p<0.01$, *** $p<0.001$.
+\end{tablenotes}
+
+\end{threeparttable}
+\end{table}

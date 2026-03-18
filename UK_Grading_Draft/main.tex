@@ -1,0 +1,146 @@
+\PassOptionsToPackage{authoryear,round}{natbib} % optional but redundant if you use the next line
+\documentclass[12pt]{article}
+
+
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage{setspace}
+\doublespacing
+
+% math / symbols / graphics
+\interfootnotelinepenalty=10000
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{bm}
+\usepackage{bbm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption,subcaption}
+\usepackage{longtable}
+\usepackage{placeins}
+\usepackage{adjustbox}
+\usepackage{makecell}
+\usepackage{threeparttable}
+\usepackage{tcolorbox}
+\usepackage{bbding}
+\usepackage{pifont}
+\usepackage{wasysym}
+\usepackage{epigraph}
+\usepackage{marginnote}
+\usepackage{lipsum}
+\usepackage{caption}
+\captionsetup[figure]{justification=raggedright,singlelinecheck=false}
+
+
+% natbib explicitly with authoryear
+\usepackage[authoryear,round]{natbib}
+\setcitestyle{aysep={,}} % (Author, Year)
+
+% links & cleveref (hyperref before cleveref; cleveref needs its closing brace!)
+\usepackage{hyperref}
+\usepackage[nameinlink]{cleveref}
+
+% theorem environments
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+
+% --------------------------------------------------
+
+
+\title{Reshuffling University Access: Analyzing Grade Distributions in the Absence of Standardized Testing. \thanks{I am indebted to Alex Bartik, Dan Bernhardt, Andy Garin, and Russell Weinstein for their
+guidance and support throughout the advancement of this project. This
+paper has benefited greatly from feedback and discussions with James Banks, Giovanni Facchini, Rachael Griffith, Katsushi Imai, Victor Lavy, Jack Mountjoy, Jesse Matheson, Robin Naylor, Elizabeth Powers, Joshua Shea, Jeremy Smith, as well as seminar and conference participants
+at  ¬University of Illinois at Urbana-Champaign, University of Nottingham, University of Manchester, University of Bath, the University of Warwick CAGE - AMES seminar series, and RES 2025 Annual Conference. This work was undertaken in the Office for National Statistics Secure Research Service using data from ONS and other owners and does not imply the endorsement of the ONS or other data owners. All errors in this analysis are my own.}}
+\author{Keitaro Ninomiya}
+\date{}
+\vspace{-5em}
+\begin{document}
+
+\maketitle
+\vspace{-3em}
+
+\begin{center}
+\begin{tcolorbox}[colback=gray!5!white, colframe=gray!30!black, boxrule=0.3pt, arc=2pt, width=0.8\textwidth]
+\centering
+\small
+\textbf{Most recent version:} 
+\href{https://www.dropbox.com/scl/fi/7we8wwl1abx47vjtfhps5/Keitaro_JMP_final.pdf?rlkey=xoz14z55ycpzd010twp8az39l&st=zxydn9yl&dl=0}{\texttt{Click here}}
+\end{tcolorbox}
+\end{center}
+
+
+
+
+\begin{abstract}
+\input{Abstract/Abstract2}
+\end{abstract}
+\thispagestyle{empty}
+
+\newpage
+\setcounter{page}{1}      % start numbering at 1 on the next page
+\pagenumbering{arabic}    % ensure arabic numbering (optional if already arabic)
+
+\input{Introduction/Quote}
+
+\section{Introduction}
+\input{Introduction/Introduction12}
+%\input{Introduction/LiteratureReview}
+
+\section{UK's higher education system and the TAG policy}
+\input{Background/Background2}
+
+\section{Data}
+\input{Data/Data}
+
+\section{Empirical Model}
+\input{Empirical Model/Empirical Model3}
+
+%\input{Empirical Model/CutoffEstimation}
+%\clearpage
+
+%\section{Quantitative Model}
+%\input{Empirical Model/QuantitativeModel2}
+\section{Results}
+\input{Results/Results3}
+
+\section{Discussion}
+\input{Discussion/Discussion}
+
+\section{Conclusion}
+\input{Conclusion/Conclusion}
+
+
+\nocite{*}
+{\small
+\bibliographystyle{apalike}
+\bibliography{reference}
+}
+
+\newpage
+\input{TablesFigures}
+
+\FloatBarrier % Ensures that all floats have been processed before continuing
+\singlespacing
+
+% Add other references as needed.
+
+\newpage
+\appendix
+\setcounter{figure}{0}
+\setcounter{table}{0}
+\renewcommand{\thefigure}{A\arabic{figure}}
+\renewcommand{\thetable}{A\arabic{table}}
+\section{Appendix}
+\input{Appendix/Empirical_Model}
+\input{Appendix/Tables_Figures}
+
+\nocite{*}
+\bibliographystyle{apalike}
+\bibliography{reference_appendix}
+
+%\input{Empirical Model/Heteroskedastic_error}
+
+
+
+\end{document}

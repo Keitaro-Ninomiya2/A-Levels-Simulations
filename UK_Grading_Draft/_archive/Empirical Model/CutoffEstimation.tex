@@ -1,0 +1,67 @@
+\subsection{Estimating University Admission Cutoffs from A-level Applications}
+
+Consider a dataset consisting of application outcomes for a particular university program. For each applicant \(i=1,\ldots,n\), I observe an outcome \(Y_i\) (e.g., an indicator for acceptance) and a multidimensional, ordered categorical running variable 
+\[
+\bm{X}_i = (X_{i1}, X_{i2}, \dots, X_{id})^\top,
+\]
+which represents the applicant's A-level scores (or UCAS tariff points) across \(d\) subjects.
+
+\subsection*{Model Specification}
+
+I model the outcome as:
+\begin{equation} \label{eq:model}
+Y_i = m(\bm{X}_i) + \varepsilon_i,
+\end{equation}
+where \( m(\bm{x}) \) is the unknown regression function, and \(\varepsilon_i\) is an error term with \(\mathbb{E}[\varepsilon_i \mid \bm{X}_i]=0\).
+
+I hypothesize that there is an unknown cutoff \( c_0 \) in the A-level score space that governs the admission decision. Applicants with scores at or above this cutoff have a higher probability of acceptance. Formally, I write:
+\[
+m(\bm{x}) = 
+\begin{cases}
+m_-(\bm{x}), & \bm{x} \prec c_0,\\[1ex]
+m_+(\bm{x}), & \bm{x} \succeq c_0,
+\end{cases}
+\]
+where the ordering \( \prec \) and \( \succeq \) is defined over the multidimensional space (for example, via a weighted index or lexicographic order).
+
+\subsection*{Kernel Function Specification}
+
+For the ordered categorical variable, I define a kernel function that assigns weights based on the Manhattan (L1) distance. Let the distance between an observation \(\bm{x}\) and a candidate cutoff \( c \) be defined as:
+\begin{equation}
+d(\bm{x}, c) = \sum_{j=1}^d |x_j - c_j|.
+\end{equation}
+I then define the triangular kernel function as:
+\begin{equation} \label{eq:kernel}
+K_h(\bm{x}, c) = \left( 1 - \frac{d(\bm{x}, c)}{h} \right) \mathbf{1}\{ d(\bm{x}, c) \leq h \},
+\end{equation}
+where \( h > 0 \) is the bandwidth parameter. This kernel assigns the highest weight to observations exactly at \( c \) and linearly decays to zero as the distance reaches \( h \).
+
+\subsection*{Difference Kernel Estimator}
+
+For a candidate cutoff \( c \in \mathcal{C} \) (where \(\mathcal{C}\) is the set of possible cutoffs in the score space), I estimate the local conditional means as follows:
+\begin{align}
+\hat{m}_-(c) &= \frac{\sum_{i=1}^n Y_i \, \mathbf{1}\{\bm{X}_i \prec c\} \, K_h(\bm{X}_i, c)}{\sum_{i=1}^n \mathbf{1}\{\bm{X}_i \prec c\} \, K_h(\bm{X}_i, c)}, \label{eq:m_minus}\\[1ex]
+\hat{m}_+(c) &= \frac{\sum_{i=1}^n Y_i \, \mathbf{1}\{\bm{X}_i \succeq c\} \, K_h(\bm{X}_i, c)}{\sum_{i=1}^n \mathbf{1}\{\bm{X}_i \succeq c\} \, K_h(\bm{X}_i, c)}. \label{eq:m_plus}
+\end{align}
+
+The estimated discontinuity at candidate cutoff \( c \) is then given by:
+\begin{equation} \label{eq:alpha_hat}
+\hat{\alpha}(c) = \hat{m}_+(c) - \hat{m}_-(c).
+\end{equation}
+
+The estimated cutoff is chosen as the candidate that maximizes the squared difference:
+\begin{equation} \label{eq:c_hat}
+\hat{c} = \arg\max_{c \in \mathcal{C}} \; \hat{\alpha}(c)^2.
+\end{equation}
+
+\subsection*{Application in University Admissions}
+
+In this context, \(\hat{c}\) represents the estimated A-level score cutoff for admission to a specific university program. The procedure is as follows:
+\begin{enumerate}
+    \item Define the multidimensional ordered categorical variable \(\bm{X}_i\) (e.g., a vector of A-level subject scores or a composite index).
+    \item Use the kernel function defined in \eqref{eq:kernel} to weight observations according to their proximity to a candidate cutoff \( c \).
+    \item Estimate the local conditional means \(\hat{m}_-(c)\) and \(\hat{m}_+(c)\) for each candidate \( c \) as in \eqref{eq:m_minus} and \eqref{eq:m_plus}.
+    \item Select the candidate cutoff that maximizes the squared difference \(\hat{\alpha}(c)^2\) as in \eqref{eq:c_hat}.
+\end{enumerate}
+
+This procedure enables consistent estimation of the unknown cutoff \( c_0 \) even when the running variable is both multidimensional and ordered categorical.

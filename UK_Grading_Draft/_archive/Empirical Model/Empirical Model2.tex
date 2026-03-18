@@ -1,0 +1,60 @@
+\subsection*{Definition of Grade Inflation}
+
+Grade inflation is defined as the difference in the probability of obtaining an A in A-levels between two cohorts (or periods), holding student and school characteristics constant. Formally, let the probability of obtaining an A for student $i$ be:
+\[
+\Pr(Y_i = 1 \mid X_i, \text{Year}_i),
+\]
+where:
+\begin{itemize}
+  \item $Y_i = 1$ if student $i$ obtains an A and $0$ otherwise,
+  \item $X_i$ is a vector of covariates (e.g., student background, school type, prior performance),
+  \item $\text{Year}_i$ is an indicator for the cohort, where $\text{Year}_i = 1$ for the recent cohort (potentially inflated grades) and $\text{Year}_i = 0$ for the baseline cohort.
+\end{itemize}
+
+The measure of grade inflation is the difference in predicted probabilities of obtaining an A between the two cohorts:
+\begin{equation}
+\theta_{i} = \Pr(Y_i = 1 \mid X_i, \text{Year}_i = 1) - \Pr(Y_i = 1 \mid X_i, \text{Year}_i = 0).
+\label{eq:inflation_def}
+\end{equation}
+
+Causal identification arises from the difference in grades assigned between cohorts that took A levels before or during the pandemic. 
+
+I choose to estimate $\theta_{i}$ by directly estimating each probability term and subtracting them, rather than using a linear probability model that directly estimates $\theta$. The literature on linear probability models points out the unreliability of estimates with differential underlying probability on its dependent variable value (Horrance and Oaxaca 2006; Wooldridge 2013). Intuitively, an OLS estimate is biased towards samples with larger variance regarding its dependent variable. Such properties obscure the estimation of school or student bodies with higher underlying probabilities of obtaining top grades, and even worse skewing the estimate towards the outliers within their category. I choose to estimate changes in the probabilities of obtaining $A$ or $A^*$ through a probit model.
+
+\subsection{Baseline Empirical Model}
+I specify the link function for estimating the probit function as the following.
+\setlength{\abovedisplayskip}{0.2cm}
+\setlength{\belowdisplayskip}{0.2cm}
+
+\begin{equation}
+    Y_{i,j,k,t} =  1\{Y^*_{i,j,k,t} \geq 0\}
+\end{equation}
+\begin{flalign*}
+Y^*_{i,j,k,t} =  & \beta\text{Year}2020_t +  \left(\sum_k \beta_k Subject_k + \sum \beta_i X_i + \sum \beta_j X_j\right) \times \text{Year}2020_t \\
+ & + \sum_l \delta_l GCSE_{i,l,t} + \sum \beta_i X_i + \sum \beta_j School_j + \sum_k \beta_k Subject_k + \epsilon_{i,j,l,k,t}
+\end{flalign*}
+\begin{equation*}
+    \epsilon_{i,j,l,k,t} \sim N(0, \sigma_{j,t}) 
+\end{equation*}
+
+\noindent $Y_{i,j,k,t}$ measures whether students ($i$) received $A$ or $A^*$, the upper two letter grade of the exam score scale, for their final grade of school $j$ with their subject of A levels $k$ at time $t$. A-levels assign a letter grade from 7 bins based on the student score on the exam. I choose to measure the result using a binary approach rather than a continuous approach\footnote{I defer discussions on to the next paragraph}. $Subject_k$ denotes a dummy variable that turn on to 1 if and only if the student took subject $k$. $\theta_k$ estimates the differences across subjects regarding school's leniency to assign a higher grade. $GCSE_{i,l,t}$ denotes a saturated variable measuring the student's performance in their GCSE exams, a standardized national exams taken by a majority of university applicants\footnote{I describe GCSE exams in section 2.}. The $GCSE$ assigns an integral between 1 and 9 based on the student's numeric score. $GCSE_{i,l,t}$ turns to 1 if the student's GCSE grade for subject $l$ falls into a grade bin. Moreover, I include only the mandatory subjects into the regression(i.e. English Literature, English Language, and Mathematics) into the regression, as other subject choice may correlated with unobserved attributes of the school or student. $X_i$ denotes the student level information such as race, gender, and social economic status. $X_j$ denotes the school level information such as school quality, type of school, and demographics. $\text{Year}2020_t$ denotes a time indicator variable that turns on to 1 for year 2020. $\text{GCSE}_{i,l,t}$, $\text{Subject}_k$, and $\text{School}_j$ denote GCSE score fixed effect, subject fixed effect, and school fixed effect, respectively. I specify the error term to follow a normal distribution with unknown error and variance. 
+
+To reflect confusion in the grading process during the pandemic, I allow the error term in Equation (2) to vary across years. Critically, estimates of parameters in probit models are biased when the error term is misspecified (Yatchew and Griliches 1985). Namely, a miss-specified probit model erroneously cannot distinguish between different degree of uncertainty in the sample and the impact of the parameter of interest. The model isolates the effect of grading method changes from the pandemic's hysteria by accounting for varying uncertainty across years.
+
+I report the grade-inflation for different school types by conditioning the non-school-type co-variates to their mean value for continuous variables (e.g. GCSE scores) and a base category for category variables (e.g. Gender, Race, etc.). Since the probit link is a nonlinear function, marginal effect estimates differ by the value of its conditional variables. 
+
+I estimate equation (2) a maximum-likelihood procedure that maximizes the following log-likelihood function.
+\[
+\ell(\beta, \gamma) = \sum_{i=1}^n \Bigg[ Y \log \Phi\left( \frac{X\beta}{\sigma_i} \right) + (1 - Y) \log \left( 1 - \Phi\left( \frac{X\beta}{\sigma_i} \right) \right) \Bigg]
+\]
+
+where:
+\begin{itemize}
+    \item \( y_i \) is the binary outcome variable (\( y_i = 1 \) or \( y_i = 0 \)).
+    \item \( \Phi(\cdot) \) is the cumulative distribution function (CDF) of the standard normal distribution.
+    \item \( X_i \) is the vector of covariates for observation \( i \).
+    \item \( \beta \) is the vector of coefficients for the mean function.
+    \item \( \sigma_i = \exp(Z_i\gamma) \) represents the heteroskedasticity, where \( Z_i \) is a vector of covariates determining the variance, and \( \gamma \) is the vector of coefficients for the variance function.
+\end{itemize}
+
+The likelihood is maximized with respect to \( \beta \) and \( \gamma \). Namely, I use the Newton-Raphson algorithm to estimate the local maximum point.

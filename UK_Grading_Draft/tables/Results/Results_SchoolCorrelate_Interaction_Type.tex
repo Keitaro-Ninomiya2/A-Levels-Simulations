@@ -1,0 +1,51 @@
+\begin{table}[ht]
+\centering
+\caption{Regression Results with Interactions}
+\begin{threeparttable}
+\begin{tabular}{lllll}
+\toprule
+& \multicolumn{2}{c}{Standardized Grade} & \multicolumn{2}{c}{A or A*} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} 
+ & (1)       & (2)       & (3)     & (4) \\
+\midrule
+Strong & 1.127*** & -0.396* & -4.082** & -0.656** \\
+ & (-0.294) & (-0.179) & (-1.502) & (-0.204) \\
+Strong2 & -0.395 & 0.578** & 0.78 & 0.676*** \\
+ & (-0.292) & (-0.178) & (-1.484) & (-0.203) \\
+Strong × Normal & -1.184* & -0.107 & 1.74 & 0.171 \\
+ & (-0.563) & (-0.342) & (-2.876) & (-0.392) \\
+Independent School & 0.152* & 0.068 & 0.227 & -0.006 \\
+ & (-0.07) & (-0.043) & (-0.358) & (-0.049) \\
+Independent School × Strong & 0.082 & -0.061 & 1.164+ & -0.095 \\
+ & (-0.125) & (-0.076) & (-0.635) & (-0.087) \\
+Further Education & 0.023 & -0.04 & -0.75 & 0.077 \\
+ & (-0.116) & (-0.071) & (-0.591) & (-0.081) \\
+Further Education × Strong & 0.373 & -0.924+ & -3.823 & -0.576 \\
+ & (-0.825) & (-0.502) & (-4.19) & (-0.574) \\
+Grammar School & -0.071 & -0.042 & -0.033 & 0.019 \\
+ & (-0.085) & (-0.052) & (-0.433) & (-0.059) \\
+Grammar School × Strong & -0.116 & 0.015 & -0.517 & 0.077 \\
+ & (-0.209) & (-0.127) & (-1.06) & (-0.145) \\
+Sixth Form College & -0.086 & 0.083 & 0.15 & 0.093 \\
+ & (-0.093) & (-0.057) & (-0.471) & (-0.065) \\
+Sixth Form College × Strong & 0.342 & 0.287+ & -2.860* & 0.081 \\
+ & (-0.265) & (-0.161) & (-1.345) & (-0.185) \\
+State School & 0.094* & -0.025 & -0.079 & -0.05 \\
+ & (-0.045) & (-0.027) & (-0.232) & (-0.031) \\
+State School × Strong & 0.134 & 0.02 & 0.595 & -0.012 \\
+ & (-0.173) & (-0.105) & (-0.881) & (-0.12) \\
+\midrule
+Model   & Tobit    & OLS      & Probit   & OLS      \\
+Estimation & MLE & MLE & MLE & MLE \\
+Num.Obs.& 2676     & 2676     & 2669     & 2676    \\
+R2 Adj. & 0.355    & 0.225    & 0.107    & 0.348   \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+    \footnotesize
+    \item[*] Notes: Standard errors are in parentheses. ***, **, and * denote significance at the 1\%, 5\%, and 10\% levels, respectively. `+` indicates significance at the 15\% level. 
+    \item Estimates are obtained  by regressing school level treatment effects, derived from the specification denoted in $\mathbf{Model}$, on school level attributes.
+    \item Estimates for Tobit and Probit are not the marginal effects, but the estimated coefficients.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

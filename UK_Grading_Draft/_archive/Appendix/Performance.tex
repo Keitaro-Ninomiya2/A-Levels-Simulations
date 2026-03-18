@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage{booktabs}   % For professional-looking horizontal lines
+\usepackage{array}      % For better column definitions
+
+\begin{document}
+
+\begin{table}[ht]
+    \centering
+    \caption{Comparison of Estimator Performance}
+    \label{tab:performance}
+    \begin{tabular}{lcccc}
+        \toprule
+        Program & Full Fixed Effect & ML (Ridge) & ML (Lasso) & Random Effect \\
+        \midrule
+        R &
+        \begin{tabular}[c]{@{}c@{}}RMSE: 1.2 \\ Bias: 0.09 \\ Time: 30s\end{tabular} &
+        \begin{tabular}[c]{@{}c@{}}RMSE: 0.79 \\ Bias: 0.03 \\ Time: 30s\end{tabular} &
+        \begin{tabular}[c]{@{}c@{}}RMSE: 0.4 \\ Bias: -0.25 \\ Time: 2h\end{tabular} &
+        \begin{tabular}[c]{@{}c@{}}RMSE: 0.8 \\ Bias: 0.7 \\ Time: 1m\end{tabular} \\
+        \hline
+        Python & 
+            \begin{tabular}[c]{@{}c@{}}RMSE: N/A \\ Bias: N/A \\ Time: N/A\end{tabular} &
+            \begin{tabular}[c]{@{}c@{}}RMSE: 0.83 \\ Bias: 0.0083 \\ Time: 1h\end{tabular} &
+            \begin{tabular}[c]{@{}c@{}}RMSE: N/A \\ Bias: N/A \\ Time: N/A\end{tabular} &
+            \begin{tabular}[c]{@{}c@{}}RMSE: N/A \\ Bias: N/A \\ Time: N/A\end{tabular} \\
+
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\end{document}

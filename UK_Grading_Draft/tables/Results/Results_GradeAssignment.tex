@@ -1,0 +1,28 @@
+\begin{table}[ht]
+\centering
+\caption{Effects across students with different GCSE scores} \label{tab:regression}
+\begin{tabular}{lccc}
+\toprule
+& Model 1 & Model 2 & Model 3 \\
+Dept & $\geq A$ & $= A^*$ & $\geq A$ \\
+\midrule
+Treat & \makecell{0.1365*** \\ (0.0058)} & \makecell{0.1938*** \\ (0.0063)} & \makecell{0.1371*** \\ (0.0059)} \\
+Treat x GCSE.Math8 & \makecell{0.0622*** \\ (0.0065)} & \makecell{-0.0791*** \\ (0.0066)} & \makecell{0.0629*** \\ (0.0065)} \\
+Treat x GCSE.Math7 & \makecell{0.0210** \\ (0.0067)} & \makecell{-0.1332*** \\ (0.0064)} & \makecell{0.0223*** \\ (0.0068)} \\
+Treat x GCSE.Math6 & \makecell{-0.0048 \\ (0.0066)} & \makecell{-0.1537*** \\ (0.0064)} & \makecell{-0.0062 \\ (0.0067)} \\
+Treat x GCSE.Math5 & \makecell{-0.0355*** \\ (0.0067)} & \makecell{-0.1692*** \\ (0.0064)} & \makecell{-0.0375*** \\ (0.0068)} \\
+Treat x GCSE.Math4 & \makecell{-0.0715*** \\ (0.0068)} & \makecell{-0.1788*** \\ (0.0065)} & \makecell{-0.0760*** \\ (0.0069)} \\
+Treat x GCSE.Math3 & \makecell{-0.1081*** \\ (0.0173)} & \makecell{-0.1910*** \\ (0.0086)} & \makecell{-0.1084*** \\ (0.0172)} \\
+\midrule
+School FE & \makecell{\checkmark \\ } & \makecell{\checkmark \\ } & \makecell{\checkmark \\ } \\
+Subject FE & \makecell{ \\ } & \makecell{ \\ } & \makecell{\checkmark \\ } \\
+\midrule
+S.E.: Clustered & \makecell{School \\ } & \makecell{School \\ } & \makecell{School \\ } \\
+\midrule
+Observations & 419,194 & 419,194 & 419,194 \\
+Model & OLS & OLS & OLS \\
+R2 & 0.31193 & 0.23721 & 0.33673 \\
+Within R2 & 0.03168 & 0.02578 & 0.03287 \\
+\bottomrule
+\end{tabular}
+\end{table}

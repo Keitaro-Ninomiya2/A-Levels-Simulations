@@ -1,0 +1,25 @@
+\begin{table}[htbp]\centering
+\caption{Regression results: School vs. Student channels}
+\begin{tabular}{lcccc}
+\hline
+ & \textbf{(School Channel)} & \textbf{(School Channel)} & \textbf{(Student Channel)} & \textbf{(Student Channel)} \\
+\hline
+(Intercept) & 0.618*** & 0.713*** & 0.420*** & 0.396*** \\
+            & (0.022)  & (0.023)  & (0.020)  & (0.022)  \\
+plogis(Base\_Estimate) & -0.009 & -0.105* & 0.078* & 0.222*** \\
+            & (0.047)  & (0.049)  & (0.043)  & (0.047)  \\
+\hline
+Year & 2020 & 2021 & 2020 & 2021 \\
+Num. Obs.   & 1878 & 1881 & 1878 & 1881 \\
+R$^2$       & 0.000 & 0.002 & 0.002 & 0.012 \\
+R$^2$ Adj.  & 0.000 & 0.002 & 0.001 & 0.012 \\
+AIC         & -999.2 & -812.4 & -1372.0 & -979.8 \\
+BIC         & -982.6 & -795.8 & -1355.4 & -963.2 \\
+Log Lik     & 502.625 & 409.210 & 689.024 & 492.913 \\
+F           & 0.039 & 2.479 & 3.524 & 22.152 \\
+RMSE        & 0.19 & 0.19 & 0.17 & 0.19 \\
+\hline
+\multicolumn{5}{l}{\footnotesize + $p<0.1$, * $p<0.05$, ** $p<0.01$, *** $p<0.001$} \\
+\end{tabular}
+\label{tab:placement_channel_table}
+\end{table}

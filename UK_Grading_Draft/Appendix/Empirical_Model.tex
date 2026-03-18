@@ -1,0 +1,219 @@
+\subsubsection{Application-Adjusted Assignment with Demographic-Specific Preferences}
+
+The second approach allows students to adjust their application choices in response to grade changes. Preferences over universities vary systematically by observable demographic characteristics. These preferences are estimated using pre-COVID application data within a multinomial logit (MNL) framework. Specifically, the probability that student $i$ applies to and attends university $j$ is given by:
+\[
+P_{ij} = \frac{e^{V_{ij}}}{\sum_{m\in\mathcal{J}_i} e^{V_{im}}},
+\quad
+V_{ij} = \beta \times S_i \times \overline{S}_{j,2019} + \iota_i + \delta_j,
+\]
+where $\delta_j$ is a university fixed effect, $\iota_i$ is a student fixed effect,  
+$S_i = \sum_{k} w_k G_{ik}$ is the weighted sum of grades for student $i$, and $\overline{S}_{j,2019}$ is the mean $S_i$ among students admitted to $j$ in 2019.  
+The choice set $\mathcal{J}_i$ consists of all universities to which student $i$ could plausibly apply.
+
+The student--university ranking under this approach is
+\[
+Rank(X_{i,j}, u) = F\big(G(X_{i,j}) \,\big|\, G(X_{-i,j}), u\big),
+\]
+with assignments determined by
+\[
+\mathcal{U}_u = \left\{X_{i,j} \,\middle|\, \sum_{Q_k > Q_u} C_k \le Rank(X_{i,j}, u) \le \sum_{Q_k > Q_u} C_k + C_u \right\}.
+\]
+
+\paragraph{Endogenous Application Mechanism.}  
+Under this model, the effect of grade changes on university composition arises through two channels:  
+(i) the direct reordering of students in the admissions ranking due to changes in $G(X_{i,j})$, and  
+(ii) the induced change in application probabilities $P_{ij}$ through the MNL utility specification. By estimating $\beta$, $\iota_i$, and $\delta_j$ using pre-COVID data, I recover the structural relationship between student characteristics, relative grade position, and application behavior. I then simulate counterfactual application sets $\mathcal{J}_i$ under alternative grade distributions, re-solving the assignment problem to capture both ranking and choice adjustments.
+\subsection{Estimating counterfactual grades for the 2020--21 cohorts}
+
+I obtain counterfactual grades for students in the pandemic years by training a prediction rule on the \emph{pre-pandemic} cohorts and then applying that rule to the pandemic cohorts. The idea is simple: estimate the relationship between observable student features (GCSEs, prior attainment, demographics, subject and school indicators, etc.) and realised grades before the pandemic, and then use that relationship to predict what each pandemic-year student would have received had the pre-pandemic mapping continued to hold.
+
+A plain ordinary least squares estimator (a maximum likelihood estimator for a linear model) performs poorly in this setting for two reasons: (i) the predictor set is large (many dummies, interactions and polynomial terms), which makes a plain regression prone to \emph{overfitting}, and (ii) many predictors are highly correlated, producing unstable coefficient estimates. To address both issues I use \emph{elastic net} regularisation, which shrinks coefficients and — when helpful — sets some coefficients exactly to zero.
+
+The elastic-net estimator is
+\begin{equation}\label{eq:elasticnet}
+    \hat\beta_{\lambda,\xi}
+    =
+    \arg\min_{\beta}
+    \left\{
+        \frac{1}{2n_{\mathrm{pre}}}\sum_{i\in\mathrm{pre}}\big(y_i - X_i^{\top}\beta\big)^2
+        +
+        \lambda\left(
+            \frac{1-\xi}{2}\|\beta\|_2^2
+            +
+            \xi\|\beta\|_1
+        \right)
+    \right\},
+\end{equation}
+where $y_i$ is the (numeric) grade for pre-pandemic student $i$, $X_i$ is the vector of predictors, $\lambda>0$ controls the overall strength of regularisation (larger $\lambda$ produces stronger shrinkage), and $\xi\in[0,1]$ mixes between ridge ($\xi=0$) and lasso ($\xi=1$) behaviour.
+
+I select the tuning parameter $\lambda$ by $K$-fold cross-validation. Split the pre-pandemic sample into $K$ folds, estimate the penalised problem on $K-1$ folds and measure prediction error on the held-out fold; repeat for each fold and choose the $\lambda$ that minimises the average held-out mean-squared error:
+\begin{equation}\label{eq:cv}
+    \lambda^{\star}
+    =
+    \arg\min_{\lambda}
+    \frac{1}{K}\sum_{k=1}^K \frac{1}{n_k}\sum_{i\in\mathrm{fold}\,k} \big(y_i - X_i^{\top}\hat\beta_{\lambda,-k}\big)^2,
+\end{equation}
+where $\hat\beta_{\lambda,-k}$ is the estimator obtained without fold $k$.
+
+With $\lambda^{\star}$ fixed, the counterfactual continuous score for a pandemic-year student with covariates $X_i$ is
+\begin{equation}
+    \widehat{y}_i^{\mathrm{CF}} = X_i^{\top}\hat\beta_{\lambda^{\star},\xi}.
+\end{equation}
+If desired, this continuous prediction can be mapped back to discrete grade categories using empirically estimated cutoffs (for example, the observed thresholds between letter grades in the pre-pandemic data). Alternatively, one may estimate a multinomial or ordinal penalised model directly and obtain predicted grade probabilities; the two approaches are broadly equivalent in spirit, and the choice depends on whether you want direct probability estimates or a continuous latent score.
+
+\paragraph{Practical implementation notes} \begin{itemize} \item \textbf{Standardisation.} Elastic-net penalties are scale-dependent. Standardise continuous predictors (zero mean and unit variance) before estimation (most software does this automatically). \item \textbf{Categorical variables.} Convert factors to dummies (one-hot encoding) but be mindful of huge design matrices (e.g. subject$\times$school interactions). Elastic net handles large $p$ but runtime and memory still matter. \item \textbf{Cross-validation folds.} If observations within schools are correlated, form CV folds that respect clustering (e.g. fold by school) so the CV error is not overly optimistic. \item \textbf{Choosing $\xi$.} Try a few values (e.g. $\xi\in{0,0.5,1}$) and report sensitivity. In practice $\xi\in(0,1)$ often combines the stability of ridge with the sparsity of lasso. \end{itemize}
+
+
+\subsection{Estimating school-level effects with Empirical Bayes}\label{app:eb}
+
+
+With many schools and uneven sample sizes, raw MLEs for school effects are noisy in small samples. Empirical Bayes (EB) ``borrows strength'' across schools by shrinking imprecise estimates toward a common mean, while leaving precise estimates largely unchanged. The amount of shrinkage is data-driven: noisier schools shrink more.
+
+\medskip
+\noindent\textbf{Setup.}
+Let $\widehat{\alpha}_j$ be the MLE of the school effect $\alpha_j$ from \Cref{eq:main} with estimated standard error $s_j \equiv \widehat{\mathrm{SE}}(\widehat{\alpha}_j)$. Under standard regularity conditions,
+\[
+\widehat{\alpha}_j \;\big|\; \alpha_j \;\approx\; \mathcal{N}(\alpha_j,\, s_j^2).
+\]
+EB posits a \emph{working} prior (random-effects distribution) for the true school effects
+\[
+\alpha_j \,\stackrel{\text{iid}}{\sim}\, \mathcal{N}(\mu,\, \tau^2),
+\]
+with unknown hyperparameters $(\mu,\tau^2)$ estimated from the collection $\{\widehat{\alpha}_j,s_j^2\}_{j=1}^J$.
+
+\medskip
+\noindent\textbf{Hyperparameter estimation (marginal MLE).}
+Integrating out $\alpha_j$ yields the marginal sampling model
+\[
+\widehat{\alpha}_j \;\sim\; \mathcal{N}\!\big(\mu,\, \tau^2 + s_j^2\big).
+\]
+The marginal log-likelihood is
+\[
+\ell(\mu,\tau^2)
+= -\tfrac{1}{2}\sum_{j=1}^J\Big\{
+\log(\tau^2 + s_j^2)
++ \tfrac{(\widehat{\alpha}_j - \mu)^2}{\tau^2 + s_j^2}
+\Big\}.
+\]
+The maximizer satisfies
+\[
+\widehat{\mu}
+= \frac{\sum_{j} w_j\,\widehat{\alpha}_j}{\sum_{j} w_j},
+\qquad
+w_j \equiv \frac{1}{\widehat{\tau}^2 + s_j^2},
+\]
+and $\widehat{\tau}^2$ solves
+\[
+\sum_{j=1}^J
+\frac{(\widehat{\alpha}_j - \widehat{\mu})^2}{(\widehat{\tau}^2 + s_j^2)^2}
+= \sum_{j=1}^J \frac{1}{\widehat{\tau}^2 + s_j^2},
+\]
+which can be obtained by a short 1D Newton or grid search.\footnote{A nonnegative constraint on $\tau^2$ is imposed; if the MLE hits $\widehat{\tau}^2=0$, no cross-school variation is detected and EB reduces to pooling at $\widehat{\mu}$.}
+
+\medskip
+\noindent\textbf{EB shrinkage estimator (posterior mean).}
+Given $(\widehat{\mu},\widehat{\tau}^2)$, the EB estimate of $\alpha_j$ is the posterior mean under the normal–normal model:
+\[
+\widehat{\alpha}^{\,EB}_j
+= (1-B_j)\,\widehat{\alpha}_j \;+\; B_j\,\widehat{\mu},
+\qquad
+B_j \equiv \frac{s_j^2}{s_j^2 + \widehat{\tau}^2}.
+\]
+Equivalently,
+\[
+\widehat{\alpha}^{\,EB}_j
+= \frac{\widehat{\tau}^2}{\widehat{\tau}^2 + s_j^2}\,\widehat{\alpha}_j
+\;+\;
+\frac{s_j^2}{\widehat{\tau}^2 + s_j^2}\,\widehat{\mu}.
+\]
+Schools with large $s_j^2$ (imprecise MLEs) have $B_j$ closer to $1$ and hence shrink more toward $\widehat{\mu}$; precise schools (small $s_j^2$) are shrunk little.
+
+The corresponding EB posterior variance (useful for uncertainty display) is
+\[
+\widehat{\mathrm{Var}}(\alpha_j \mid \widehat{\alpha}_j)
+= \frac{s_j^2\,\widehat{\tau}^2}{s_j^2 + \widehat{\tau}^2}.
+\]
+
+\medskip
+\noindent\textbf{Treatment-year school effects.}
+For treatment-year deviations $\Delta\alpha_{j,\tau}$ with MLEs $\widehat{\Delta\alpha}_{j,\tau}$ and errors $s_{j,\tau}$, apply the same steps with a potentially different hyper-variance $\tau^2_{\Delta,\tau}$ and mean $\mu_{\Delta,\tau}$:
+\[
+\widehat{\Delta\alpha}^{\,EB}_{j,\tau}
+= (1-B_{j,\tau})\,\widehat{\Delta\alpha}_{j,\tau} \;+\; B_{j,\tau}\,\widehat{\mu}_{\Delta,\tau},
+\quad
+B_{j,\tau} \equiv \frac{s_{j,\tau}^2}{s_{j,\tau}^2 + \widehat{\tau}_{\Delta,\tau}^{\,2}}.
+\]
+
+\medskip
+\noindent\textbf{Remarks.}
+(i) EB uses plug-in $(\widehat{\mu},\widehat{\tau}^2)$, so intervals based solely on the posterior variance above understate hyperparameter uncertainty; in large $J$ this is typically minor. (ii) Centering at $\widehat{\mu}$ (rather than $0$) avoids implicit assumptions that the grand mean effect is zero. (iii) The gain is variance reduction for noisy schools with limited bias, which is crucial with many parameters and heterogeneous cell sizes.
+
+% If you prefer shrinkage toward zero, set $\widehat{\mu}=0$ in the formulas above, which yields the simplified weight you wrote in the main text.
+
+\subsection{Monte Carlo: school-type estimation and extrapolation bias}
+\label{app:mc_school_type}
+The simulation in \Cref{eq:main} is designed so that independent schools concentrate at the top of the
+quality distribution, while state schools sit primarily in the middle. A pooled specification that imposes
+common slopes extrapolates the state-school relationship into the independent tail, which is precisely where
+the data are sparse. Estimating the model separately by school type avoids this extrapolation bias by allowing
+type-specific slopes and intercept shifts. Table~\ref{tab:mc_hyperparams_type} summarizes the Monte Carlo
+distribution of the school-inflation parameter $\Delta\alpha_j$ and its implied relative risk reduction (RRR),
+using the split-by-type estimator across 50 replications with EB-shrunk school effects.
+To make the magnitudes explicit, the EB-shrunk means (s.d.) for $\mu_{\Delta}$ are
+1.114 (0.009) overall, 1.128 (0.007) for state schools, 1.040 (0.011) for academies, and 1.350 (0.106) for
+independent schools; the corresponding $\mu_{\mathrm{RRR}}$ means (s.d.) are 0.444 (0.003), 0.423 (0.003),
+0.435 (0.006), and 0.665 (0.034).
+
+\FloatBarrier
+\begin{table}[!htbp]
+\centering
+\caption{Monte Carlo hyperparameters for school inflation and implied RRR}
+\label{tab:mc_hyperparams_type}
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lcccccc}
+\toprule
+Group & True $\mu_{\Delta}$ & Est.\ $\mu_{\Delta}$ & True $\tau^2_{\Delta}$ & Est.\ $\tau^2_{\Delta}$ & True $\mu_{\mathrm{RRR}}$ & Est.\ $\mu_{\mathrm{RRR}}$ \\
+\midrule
+Overall      & 1.050 & 1.114 (0.009) & 0.120 & 0.061 (0.011) & 0.428 & 0.444 (0.003) \\
+State        & 1.089 & 1.128 (0.007) & 0.115 & 0.070 (0.006) & 0.417 & 0.423 (0.003) \\
+Academy      & 0.983 & 1.040 (0.011) & 0.128 & 0.037 (0.031) & 0.419 & 0.435 (0.006) \\
+Independent  & 1.028 & 1.350 (0.106) & 0.100 & 0.002 (0.000) & 0.568 & 0.665 (0.034) \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\vspace{0.5em}
+\begin{minipage}{0.95\textwidth}
+\footnotesize
+\textit{Notes.} Estimates are Monte Carlo means (standard deviations in parentheses) from the split-by-type
+estimator. The inflation parameter is $\Delta\alpha_j$ from \Cref{eq:main}. The RRR is
+$(P_{\text{covid}} - P_{\text{baseline}}) / (1 - P_{\text{baseline}})$, computed for the type-specific
+reference student in the simulation. The split-by-type design avoids extrapolating the state-school slope
+into the independent tail and yields stable RRR estimates for state schools.
+\end{minipage}
+\end{table}
+\FloatBarrier
+
+\subsection{Computation of variance in full model}
+% --- Method paragraph (paste into Methods / Appendix) ---
+\paragraph{Computation of variances for the full model.}
+Computing standard errors in our high-dimensional, sparse likelihood required estimating the diagonal
+of the observed-information matrix \(H^{-1}\) (the parameter variances). A direct approach (form \(H^{-1}\)
+or compute a full Cholesky factor) proved infeasible: sparse Cholesky factorization produced excessive
+fill-in and exhausted memory for our problem size. To avoid factorization and the attendant memory
+costs we combine an iterative linear solver (Conjugate Gradient, CG) with the Hutchinson trace estimator.
+Concretely, for \(m\) independent Rademacher probe vectors \(z^{(r)}\in\{\pm 1\}^n\) we solve
+\(H x^{(r)} = z^{(r)}\) by CG and accumulate the elementwise products \(z^{(r)}\odot x^{(r)}\); the
+sample average is an unbiased estimator of \(\operatorname{diag}(H^{-1})\). This approach only requires
+sparse matrix–vector products and a small working set of vectors, so its memory use scales with the
+number of nonzeros of \(H\) (and not with the fill-in of a factor). For reproducibility we implement the
+CG solver using Eigen’s sparse CG via \texttt{RcppEigen}, run \(m=200\) probes, set the solver tolerance
+to \(\text{tol}=10^{-8}\) and cap iterations at \(\text{maxit}=2000\). Practical diagnostics include: (i)
+verify \(H\) is stored as a \texttt{dgCMatrix} and is numerically symmetric/positive definite (force
+symmetry and add a tiny ridge if needed); (ii) monitor CG residuals for each probe and increase \(\text{tol}\)
+or add an incomplete-Cholesky preconditioner if convergence is slow; (iii) choose \(m\) by trading off
+accuracy and CPU (typical \(m\in[100,500]\)); and (iv) validate the estimator on a small index set by
+comparing Hutchinson estimates to exact variances computed by direct solves for those indices when feasible.
+These choices deliver accurate, scalable variance estimates without ever forming \(H^{-1}\) or a full factor,
+and the implementation details and minimal code used in this paper are provided below for reproducibility.%
+\footnote{A compact description of this procedure used for computing the appendix variances is given in the
+original implementation notes.} 

@@ -1,0 +1,33 @@
+\begin{table}[ht]
+\centering
+\caption{Regression Table} \label{tab:regression}
+\begin{threeparttable}
+\begin{tabular}{lllll}
+\toprule
+\midrule
+& \multicolumn{2}{c}{Standardized Grade} & \multicolumn{2}{c}{A or A*} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} 
+ & (1) & (2) & (3) & (4) \\
+\midrule
+Strong & 0.664*** & -0.417*** & -3.770*** & -0.575*** \\
+       & (0.128)  & (0.078)   & (0.652)   & (0.089)   \\
+Strong$^2$ & -0.916*** & 0.449*** & 2.919*** & 0.664*** \\
+           & (0.148)    & (0.090)  & (0.752)   & (0.103)   \\
+Normal & 0.090    & 0.157+   & 2.091**  & 0.106    \\
+       & (0.141)  & (0.086)   & (0.730)   & (0.098)   \\
+Normal$^2$ & -0.198   & -0.150+  & -1.407*  & -0.080   \\
+           & (0.126)   & (0.077)   & (0.651)   & (0.088)   \\
+\midrule
+Model   & Tobit    & OLS      & Probit   & OLS      \\
+Num.Obs.& 2676     & 2676     & 2669     & 2676     \\
+R2 Adj. & 0.355    & 0.225    & 0.107    & 0.348    \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+    \footnotesize
+    \item[*] Notes: Standard errors are in parentheses. ***, **, and * denote significance at the 1\%, 5\%, and 10\% levels, respectively.
+    \item Estimates are obtained  by regressing school level treatment effects, derived from the specification denoted in $\mathbf{Model}$, on school level attributes. 
+    \item Estimates for Tobit and Probit are not the marginal effects, but the estimated coefficients.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

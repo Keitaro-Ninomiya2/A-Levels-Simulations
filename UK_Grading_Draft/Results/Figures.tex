@@ -1,0 +1,130 @@
+%\input{tables/Results/Results_SchoolCorrelateTypeBinary}
+%\clearpage
+
+%\input{tables/Results/Results_SchoolCorrelateBinary}
+
+%\clearpage
+
+%\input{tables/Results/Results_SchoolCorrelate_Interaction_Type}
+%\clearpage
+
+%\input{tables/Results/Results_Subjects}
+%\clearpage
+
+\begin{figure}[!htbp]
+  \caption{Grade inflation by school quality and subject group. }
+  \centering
+  \begin{subfigure}[t]{\linewidth}
+    \centering
+    \caption{2020}
+    \vspace{-0.5em}
+    \includegraphics[width=\linewidth]
+    {figures/Results/treatment_effects_by_schoolquality_subjectGroup_20.pdf}
+    \label{fig:inflation_subject20}
+  \end{subfigure}
+
+  \vspace{-0.5em}
+  
+  \begin{subfigure}[t]{\linewidth}
+    \centering
+    \caption{2021}
+    \vspace{-0.5em}
+    \includegraphics[width=\linewidth]{figures/Results/treatment_effects_by_schoolquality_subjectGroup_21.pdf}
+    \label{fig:inflation_subject21}
+  \end{subfigure}
+  \label{fig:inflation_subjects_20_21}
+  \vspace{-0.5em}
+    \caption*{\footnotesize Note: This bin-scatter displays the subject group level increments in grade improvements defined as a student receiving a top grade (A or $\text{A}^*$) in (a) 2020 and (b) 2021. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). Year-specific coefficients and 95\% confidence intervals are from a logistic regression that regresses a success dummy indicating the student receiving a top grade (A or $\text{A}^*$) on the interaction between school subject group dummy and a time indicator for both pandemic years. The regression controls for students' achievement score in a previous standardized national exam (GCSE) in mandatory subjects (mathematics and English literature) and a dummy variable for the subject course of the exam. Standard errors are clustered at the school-subject course level. }
+\end{figure}
+\clearpage
+
+\begin{figure}[!htbp]
+\label{fig:inflation_school_type}
+  \caption{Grade inflation by school type}
+  \vspace{-.5em}
+  \centering
+  \begin{subfigure}[t]{\linewidth}
+    \centering
+    \caption{}
+    \includegraphics[width=.8\linewidth]{figures/Results/treatment_by_schooltype_indep.pdf}
+    \label{fig:inflation_subject20}
+  \end{subfigure}
+
+  \vspace{4pt} % small gap between panels
+
+  \begin{subfigure}[t]{\linewidth}
+    \centering
+    \caption{}
+    \vspace{-.5em}
+    \includegraphics[width=.8\linewidth]{figures/Results/treatment_by_schooltype_sixth.pdf}
+    \label{fig:inflation_subject21}
+  \end{subfigure}
+  \label{fig:inflation_subjects_20_21}
+  \caption*{\footnotesize Note: The bin-scatter displays the school level increments in grade improvements defined as a student receiving a top grade (A or $\text{A}^*$) in (a) 2020 and (b) 2021. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). Year-specific coefficients and 95\% confidence intervals are from a logistic regression that regresses a success dummy indicating the student receiving a top grade (A or $\text{A}^*$) on the interaction between school subject group dummy and a time indicator for both pandemic years. The regression controls for students' achievement score in a previous standardized national exam (GCSE) in mandatory subjects (mathematics and English literature) and a dummy variable for the subject course of the exam. Standard errors are clustered at the school-subject course level. }
+\end{figure}
+\clearpage
+
+% in preamble: \usepackage{caption,subcaption}
+\begin{figure}[!htb]
+  \centering
+    \caption{Aggregate dynamics}    
+    \includegraphics[width=1\linewidth]{figures/Results/DynamicsSchool_A.pdf}
+    \label{fig:inflation_dynamics}
+    \caption*{\footnotesize Note: The bin-scatter displays the school level grade improvements in 2021 relative the degree of grade improvements in 2020 for the same school. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). Year-specific coefficients and 95\% confidence intervals are from a logistic regression that regresses a success dummy indicating the student receiving a top grade (A or $\text{A}^*$) on the interaction between school subject group dummy and a time indicator for both pandemic years. The regression controls for students' achievement score in a previous standardized national exam (GCSE) in mandatory subjects (mathematics and English literature) and a dummy variable for the subject course of the exam. Standard errors are clustered at the school-subject course level. }
+\end{figure}
+
+\begin{figure}
+    \centering
+    \caption{By subject groups}
+    \includegraphics[width=\linewidth]{figures/Results/Dynamics_Course_2x2_rect_aligned.pdf}
+    \label{fig:inflation_dynamics}
+    \caption*{\footnotesize Note: The bin-scatter displays the school-subject-group level grade improvements in 2021 relative the degree of grade improvements in 2020 for the same school. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). Year-specific coefficients and 95\% confidence intervals are from a logistic regression that regresses a success dummy indicating the student receiving a top grade (A or $\text{A}^*$) on the interaction between school subject group dummy and a time indicator for both pandemic years. The regression controls for students' achievement score in a previous standardized national exam (GCSE) in mandatory subjects (mathematics and English literature) and a dummy variable for the subject course of the exam. Standard errors are clustered at the school-subject course level. }
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \caption{Grade inflation by GCSE score by exam subject.}
+  \begin{subfigure}[t]{\linewidth}
+    \centering
+    \caption{Gender gap in grade inflation by school quality}
+    \includegraphics[width=0.94\linewidth]{figures/Results/Gender_BySchoolQuality_A.pdf}
+    \label{fig:gender_sq}
+  \end{subfigure}
+
+  \vspace{0.8em}
+
+  \begin{subfigure}[t]{\linewidth}
+    \centering
+    \caption{Ethnicity gap in grade inflation by school quality}
+    \includegraphics[width=0.94\linewidth]{figures/Results/Ethnic_BySchoolQuality_A.pdf}
+    \label{fig:ethnic_sq}
+  \end{subfigure}
+
+  \label{fig:gender_ethnic_sq_combined}
+  \caption*{\footnotesize Note: The bin-scatter displays the school level difference in grade improvements between (a)female and male students and (b) while and non-white students. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). Year-specific coefficients and 95\% confidence intervals are from a logistic regression that regresses a success dummy indicating the student receiving a top grade (A or $\text{A}^*$) on the interaction between school subject group dummy and a time indicator for both pandemic years. The regression controls for students' achievement score in a previous standardized national exam (GCSE) in mandatory subjects (mathematics and English literature) and a dummy variable for the subject course of the exam. Standard errors are clustered at the school-subject course level. }
+\end{figure}
+\clearpage
+
+
+\begin{figure}
+    \centering
+    \caption{Reduced form result of application success on grade inflation}
+    \includegraphics[width=\linewidth]{figures/Results/Reduced_Form.pdf}
+    \label{fig:placeholder}
+      \label{fig:gcse_combined}
+  \caption*{\footnotesize Note: The figure displays school level improvements in success rate of securing a placement at a students top choice university program versus the extent of grade inflation at the school. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). The y-axis coefficients and 95\% confidence intervals are from a student level logistic regression that regresses a success of student application on the interaction between school subject group dummy and a time indicator for both pandemic years. The x-axis coefficients and 95\% confidence intervals are from a student level logistic regression that regresses a dummy variable indicating whether a student received a top grade (A or $\text{A}^*$) in their exam on the interaction between school subject group dummy and a time indicator for both pandemic years. Both regressions control for students' achievement score in a previous standardized national exam (GCSE) in mandatory subjects (mathematics and English literature) and a dummy variable for the subject course of the exam. Standard errors are clustered at the school-subject course level. }
+\end{figure}
+\clearpage
+
+\begin{figure}
+    \centering
+    \caption{Decomposition of university composition by source}
+    \includegraphics[width = \linewidth]{figures/Results/Aggregate.pdf}
+    \label{fig:placeholder}
+      \label{fig:gcse_combined}
+      \caption*{\footnotesize Note: The bin plot displays a decomposition of the increase in the number of incoming student at each university tier group by separate channels. The sample is the universe of A-level exams used for admissions at British universities through the centralized administrative system (N = 2,802,651). Tariff groups denotes the degree of selectivity of the university program, with high tariff indicating the most selective university tier group and the lower tariff indicating the least selective group.}
+\end{figure}
+\clearpage
+
+
+\clearpage

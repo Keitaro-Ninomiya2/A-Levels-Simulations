@@ -1,0 +1,61 @@
+\captionsetup{justification=raggedright,singlelinecheck=false} % put caption ragged-left under heading
+
+\begin{table}[htbp]
+\centering
+  % ---------- Panel heading above caption ----------
+  \caption{Regression results: Treatment estimates by subject type}\label{tab:subject_group_sq_grades}
+\begin{threeparttable}
+  \small
+
+  \vspace{0.3em}
+  \vspace{0.4em}
+
+  % ===== Top table: Non-Quantitative =====
+  {\centering\textbf{Non-Quantitative subjects}\par}
+  \begin{tabular*}{0.95\textwidth}{@{\extracolsep{\fill}} l c c c c c c @{}}
+    \toprule
+      & \multicolumn{2}{c}{\textbf{A}} & \multicolumn{2}{c}{\textbf{A*}} & \multicolumn{2}{c}{\textbf{B}} \\
+      \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+      & \textbf{(1)} & \textbf{(2)} & \textbf{(3)} & \textbf{(4)} & \textbf{(5)} & \textbf{(6)} \\
+    \midrule
+    \textbf{School Quality} & 
+      -0.598\textbf{***} & -0.729\textbf{***} & -0.523\textbf{***} & -0.538\textbf{***} & -0.062\textbf{**} & -0.111\textbf{***} \\
+    & (0.032) & (0.033) & (0.027) & (0.031) & (0.021) & (0.021) \\
+    \addlinespace[0.4em]
+    \midrule
+    Year       & 2020 & 2021 & 2020 & 2021 & 2020 & 2021 \\
+    Num. Obs.  & 1887 & 1889 & 1887 & 1889 & 1879 & 1876 \\
+    R$^2$      & 0.155 & 0.208 & 0.163 & 0.141 & 0.004 & 0.014 \\
+    \bottomrule
+  \end{tabular*}
+
+  \vspace{1.0em}
+
+  % ===== Bottom table: Quantitative =====
+  {\centering\textbf{Quantitative subjects}\par}
+  \vspace{0.2em}
+  \begin{tabular*}{0.95\textwidth}{@{\extracolsep{\fill}} l c c c c c c @{}}
+    \toprule
+      & \multicolumn{2}{c}{\textbf{A}} & \multicolumn{2}{c}{\textbf{A*}} & \multicolumn{2}{c}{\textbf{B}} \\
+      \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+      & \textbf{(1)} & \textbf{(2)} & \textbf{(3)} & \textbf{(4)} & \textbf{(5)} & \textbf{(6)} \\
+    \midrule
+    \textbf{School Quality} &
+      -0.200\textbf{***} & -0.220\textbf{***} & 0.018 & 0.006 & -0.001 & -0.071\textbf{***} \\
+    & (0.027) & (0.034) & (0.023) & (0.022) & (0.021) & (0.021) \\
+    \addlinespace[0.4em]
+    \midrule
+    Year       & 2020 & 2021 & 2020 & 2021 & 2020 & 2021 \\
+    Num. Obs.  & 1887 & 1889 & 1879 & 1876 & 1879 & 1876 \\
+    R$^2$      & 0.029 & 0.022 & 0.000 & 0.000 & 0.000 & 0.006 \\
+    \bottomrule
+  \end{tabular*}
+
+  \vspace{0.6em}
+    \noindent\begin{minipage}{\textwidth}
+    \footnotesize
+    \textbf{Notes:} The table reports the regression coefficient that regresses the inflation measure defined in \Cref{eq:main} on the measure of school quality, the school type dummy variable, and the interaction of the two variables. Degree of inflation is measured as the average marginal effect (AME) at the school level, in which I calculates the average marginal effect of the school inflation for all students within the school. Namely, the latent scores of each students without the inflation effects are calculated by mapping the student attributes on the fixed effect coefficient in \Cref{eq:main}. Before the AME is calculated, I apply the shrinkage correction method by \cite{b933f52e-83fe-34bb-bf19-f7f3e5459001}.School quality is defined as the fixed effect derived from \Cref{eq:main}. The school fixed effect is evaluated by calculating the probability of obtaining A or A* for the nationally representative student, which I define as the student with median values in their continuous or categorical variables. School fixed effects are corrected for the incidental parameter bias by using methods by \cite{FERNANDEZVAL2016291}
+    . Schools without less than 30 students in both 2020 and 2021 taking A-level exams are dropped from the regression. Column 1 and 2 uses A, Column 3 and 4 uses A*, and Column 5 and 6 uses B as the binary dependent variable for estimating \Cref{eq:main}.  Bootstrapped standard errors at obtained by blocking at the school level. + $p<0.1$, * $p<0.05$, ** $p<0.01$, *** $p<0.001$.
+    \end{minipage}
+    \end{threeparttable}
+\end{table}

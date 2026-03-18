@@ -1,0 +1,84 @@
+\section{Experimental Linear-in-Means Model with Subject-Specific Instruments}
+
+Suppose individuals are organized into groups of size \( n \) (e.g., classrooms) within schools. For each individual \( i \) we observe an outcome \( y_i \) (generated from a latent variable), an exogenous regressor \( x_i \), and a subject label \( s_i \) (e.g., Math, English, Physics, \(\dots\), from a set \(\mathcal{S}\) of 20 subjects). Let \( \mu_{s_i} \) denote the subject-specific fixed effect. The baseline latent variable model is
+\[
+y_i^* = \alpha + \beta\, x_i + \mu_{s_i} + \lambda_{\text{eff}} \, (Wy)_i + \varepsilon_i,
+\]
+where
+\[
+\lambda_{\text{eff}} = \lambda_C + \delta \, D_i,
+\]
+with \( D_i \) a (group-level) treatment indicator and
+\[
+(Wy)_i = \sum_{j\neq i} w_{ij}\, y_j, \quad w_{ij} = \frac{1}{n-1}, \quad w_{ii}=0.
+\]
+The observed binary outcome is given by
+\[
+y_i = \mathbf{1}\{ y_i^* > 0 \}.
+\]
+
+Pooling individuals, the structural model to be estimated as a linear probability model (LPM) is
+\[
+y_i = \alpha + \beta\, x_i + \lambda_C\,(Wy)_i + \delta\, \bigl[ D_i\,(Wy)_i \bigr] + \eta_i,
+\]
+where \(\eta_i\) is an error term.
+
+\subsection*{Endogeneity and IV Identification}
+
+The peer regressor \((Wy)_i\) is endogenous because it is determined jointly with \( y_i \) (the reflection problem). In our baseline IV strategy we might use the leave--one--out average of \(x\),
+\[
+z_i = (Wx)_i = \sum_{j \neq i} w_{ij}\, x_j,
+\]
+and its interaction \(D_i\, z_i\) as instruments. However, we wish to refine the instrument by exploiting the fact that subject content influences the outcome. 
+
+Define the set of peers within the same group who share the same subject as
+\[
+\mathcal{N}_i(s) = \{ j \neq i : s_j = s_i \}.
+\]
+We then define the subject-specific leave--one--out average of \( x \) as:
+\[
+z_i^{(s)} = \begin{cases}
+\displaystyle \frac{1}{|\mathcal{N}_i(s)|} \sum_{j\in \mathcal{N}_i(s)} x_j, & \text{if } |\mathcal{N}_i(s)| > 0, \\[1mm]
+x_i, & \text{if } |\mathcal{N}_i(s)| = 0.
+\end{cases}
+\]
+We use \( z_i^{(s)} \) and \( D_i\, z_i^{(s)} \) as instruments for \((Wy)_i\) and \(D_i\,(Wy)_i\), respectively. Thus, the instrument vector for individual \(i\) is:
+\[
+Z_i = \begin{pmatrix} 1 \\ x_i \\ z_i^{(s)} \\ D_i\, z_i^{(s)} \end{pmatrix}.
+\]
+
+\subsection*{Two-Stage Least Squares (2SLS) Estimation}
+
+The IV strategy is implemented in two stages:
+\begin{enumerate}
+    \item \textbf{First Stage:} Regress the endogenous variables
+    \[
+    \begin{pmatrix} (Wy)_i \\ D_i\,(Wy)_i \end{pmatrix}
+    \]
+    on the instrument vector \( Z_i \) to obtain the predicted values
+    \[
+    \begin{pmatrix} \widehat{(Wy)}_i \\ \widehat{D_i\,(Wy)}_i \end{pmatrix}.
+    \]
+    
+    \item \textbf{Second Stage:} Regress \( y_i \) on an intercept, \( x_i \), \( \widehat{(Wy)}_i \), and \( \widehat{D_i\,(Wy)}_i \):
+    \[
+    y_i = \alpha + \beta\, x_i + \lambda_C\, \widehat{(Wy)}_i + \delta\, \widehat{D_i\,(Wy)}_i + \eta_i.
+    \]
+    The coefficients on \( \widehat{(Wy)}_i \) and \( \widehat{D_i\,(Wy)}_i \) provide consistent estimates of \( \lambda_C \) and \( \delta \), respectively.
+\end{enumerate}
+
+\subsection*{Summary}
+
+To summarize, our identification strategy for the experimental linear-in-means model with subject heterogeneity is as follows:
+\begin{align*}
+y_i^* &= \alpha + \beta\, x_i + \mu_{s_i} + \left[\lambda_C + \delta\, D_i\right] (Wy)_i + \varepsilon_i, \\
+y_i &= \mathbf{1}\{ y_i^* > 0 \}, \\
+(Wy)_i &= \sum_{j \neq i} w_{ij}\, y_j, \quad w_{ij}=\frac{1}{n-1}, \; w_{ii}=0, \\
+z_i^{(s)} &= \frac{1}{|\mathcal{N}_i(s)|} \sum_{j\in\mathcal{N}_i(s)} x_j, \quad \text{(with the convention that if } |\mathcal{N}_i(s)| = 0, \text{ then } z_i^{(s)} = x_i\text{)}, \\
+Z_i &= \begin{pmatrix} 1 \\ x_i \\ z_i^{(s)} \\ D_i\, z_i^{(s)} \end{pmatrix}.
+\end{align*}
+The structural model for estimation is
+\[
+y_i = \alpha + \beta\, x_i + \lambda_C\,(Wy)_i + \delta\, \left[ D_i\,(Wy)_i \right] + \eta_i,
+\]
+and we use 2SLS with \(Z_i\) as instruments for \((Wy)_i\) and \(D_i\,(Wy)_i\).

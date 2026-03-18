@@ -1,0 +1,144 @@
+
+\subsection{Inflation effect by schools}
+
+\Cref{fig:inflation_main} shows that the degree of grade inflation was higher in lower-quality schools. The top and bottom panels respectively report the extent of grade inflation for every school in the UK in 2020 and 2021, by school quality; school quality is measured by the probability that a nationally median student at the school achieves a top grade. In both 2020 and 2021, grade inflation was greater in lower-quality schools. A one-unit increase in school quality — measured by the nationally median student’s probability of receiving a top grade — was associated with 0.45 and 0.47 percentage-point smaller degrees of grade inflation in 2020 and 2021, respectively (\Cref{tab:main_sq_results}).
+
+The negative relationship between school quality and the extent of inflation holds after controlling for students’ underlying probability of receiving a top grade. Because grades are capped at the top, \Cref{eq:main} may fail to identify grade inflation for schools that already have high probabilities of students receiving top grades: most students in those schools would obtain top A-level grades regardless of the grading method. To separate compositional effects from true grade-inflation effects, I re-estimate the inflation using A* as the dependent variable and additionally interact students’ GCSE scores with the school indicators. Columns 3 and 4 of\Cref{tab:main_sq_results} report the correlation between school quality and the extent of inflation for A* and B, respectively.  The smaller correlation coefficient for A* reflects how rarely low-to-mid school assigned A*, which flattens the estimated effect. By contrast, the coefficient for B is larger in magnitude than that for A, because lowering the grade threshold increases the pool of schools included in the regression.
+
+I find that schools loosened their grading standards in subjects with less quantitative content. \Cref{fig:inflation_subject20} and \Cref{fig:inflation_subject21} report the relationship between school quality and the extent of grade inflation by subject type. On average, a one-unit increase in school quality was associated with a 1.5 percentage-point lower probability of receiving a top grade in non-quantitative subjects and a 0.5 percentage-point lower probability in quantitative subjects (\Cref{tab:subject_group_sq_grades}). Columns 3 to 6 of \Cref{tab:subject_group_sq_grades} report regression coefficients using A* and B as dependent variables. The results show that the negative correlation between school quality and inflation is concentrated in non-quantitative subjects; no statistically significant relationship appears in quantitative subjects. These findings underscore that subjects which leave more grading discretion to teachers were the main channels schools used to raise students' grades.
+
+I provide evidence that privately run schools inflated their pupils’ grades more than other school types. \Cref{fig:inflation_school_type} shows a bin-scatter plot comparing major publicly funded schools (e.g., academies and state schools) with privately run (independent) schools. \Cref{tab:main_schooltype} reports differences in grading patterns across school types and decomposes those estimates by school quality. Across the school-quality distribution, independent schools were more likely than publicly funded schools to assign top grades. Independent schools also adapted fastest to the new grading regime, increasing the rate of top-grade assignments in 2021 more than any other school type.
+
+Notably, the difference in inflation between independent and other public schools does not appear to be driven by selectivity: I find no difference in inflation between grammar schools (public selective schools) and other public schools (\Cref{fig:treatment_type_grammar}). I also find that sixth-form colleges—schools focused on preparing students for A-levels—experienced lower degrees of grade inflation in both 2020 and 2021. These differences are not driven by subject composition or student composition: the degree of grade inflation at sixth-form colleges was lower than at academies and state schools.
+
+\subsection{Persistence and Feedback of Grade Inflation}
+
+I estimate persistence in grade inflation across years by regressing 2021 inflation levels on 2020 inflation levels within the same school. Namely, I estimate
+\begin{equation}
+\Delta\alpha_{j,2021} = \rho\,\Delta\alpha_{j,2020} + \varepsilon_j .
+\end{equation}
+
+I further decompose persistence by estimating subject-group--level grade inflation. Let
+\begin{equation}
+Y_{i,j,k,t} = \mathbf{1}\{Y_{i,j,k,t}^* \ge 0\},
+\end{equation}
+and model the latent index as
+\begin{align}
+Y_{i,j,k,t}^*
+&= \alpha_j + X_i\eta + \gamma_k \notag\\
+&\quad + \sum_{\tau\in\{2020,2021\}}
+    D_\tau \times\Bigg(
+        \sum_{g\in\mathcal{G}\setminus\{g_0\}} 
+        G_{k,g}\,\Delta\alpha_{j,\tau,g}
+        + X_i\Delta\eta_\tau
+        + \Delta\gamma_{k,\tau}
+    \Bigg),
+\end{align}
+where \(G_{k,g}\) is an indicator for whether subject \(k\) belongs to group \(g\) (e.g., quantitative vs.\ non-quantitative).
+
+To study within-school persistence by subject group, I estimate
+\begin{equation}\label{eq:dynamics}
+\Delta\alpha_{j,g,2021}
+= \rho_{\mathrm{same}}\,\Delta\alpha_{j,g,2020}
++ \rho_{\mathrm{other}}\,\bar{\Delta\alpha}_{j,-g,2020}
++ \varepsilon_{j,g},
+\end{equation}
+where \(\bar{\Delta\alpha}_{j,-g,2020}\) denotes the average 2020 inflation in school \(j\) across subject groups other than \(g\).
+
+The coefficients reported are descriptive and should not be given a causal interpretation. These estimates may confound unobserved factors that changed across the two pandemic years. The dynamic-panel literature (e.g., \cite{bond2002dynamic}) also discusses potential biases from estimating dynamics with specifications like \eqref{eq:dynamics}. Nonetheless, the estimates are informative about the persistence of grade inflation.
+
+
+\Cref{fig:inflation_dynamics} reports the dynamic pattern of grade inflation across the two consecutive years. The y-axis measures the average increase in a student's probability of achieving a top grade in 2021, and the x-axis measures that increase in 2020. Schools with inflation levels near zero continued to inflate their students' grades at similar levels in the second year. By contrast, schools with low inflation in the first year increased their rate of grade inflation in 2021, while schools with high initial inflation slightly reduced their degree of inflation in the second year. This pattern is reflected in the estimates from \Cref{eq:dynamics}: a one-unit difference in the degree of inflation in 2020 is associated with a 0.6-unit difference in 2021. As \Cref{fig:inflation_dynamics} shows, the slope is driven by adjustments among schools that did not inflate much in the initial year. Moreover, the extent of assigning B-or-higher grades did not vary across years (column 3 of Panel A in \Cref{tab:dynamics}).
+
+\Cref{fig:inflation_subjects_20_21} reports school-level inflation separately by subject group (quantitative vs.\ non-quantitative). The figure plots the average inflation levels across subject groups over the two consecutive years. As \Cref{tab:dynamics} shows, a one-unit difference in the degree of inflation in 2020 for non-quantitative subjects was associated with a 0.5-unit difference in the same subject group in 2021. By contrast, a one-unit difference in grade inflation for quantitative subjects in 2020 was associated with a 0.2-unit difference in that subject group in 2021.
+
+Subfigure A of \Cref{fig:inflation_subjects_20_21} indicates that persistence within subject groups is pronounced for non-quantitative subjects. Schools' inflation levels in non-quantitative subjects remained similar to their initial-year levels, although schools that inflated less in the first year tended to increase their inflation in the second year. Subfigure D shows that quantitative subjects exhibit a weaker correlation across years: a positive relationship exists, but schools with high initial inflation tended to reduce their inflation in the second year, whereas schools with low initial inflation tended to increase it.
+
+
+Subfigures B and D in \Cref{fig:inflation_subjects_20_21} report cross-subject inflation levels between neighboring subject groups over the two years. As the columns for cross-subject combinations in \Cref{tab:dynamics} confirm, I find little evidence of spillovers or feedbacks of grade inflation across neighboring subjects. Columns (1)--(4) show that a one-unit increase in grade inflation in a given subject group is not associated with a statistically significant increase in inflation in the neighboring subject in the following year. 
+
+However, the cross-subject coefficient is statistically significant for the outcome ``B-or-higher.'' A one-unit difference in 2020 grade inflation in quantitative (non-quantitative) subjects is associated with a 0.3-unit difference in 2021 grade inflation for non-quantitative (quantitative) subjects, respectively. Notably, these cross-subject coefficients are smaller than the within-group coefficients.
+
+\subsection{Institutional differences in grading biases within classrooms}
+How were grades reassigned to students within a classroom? \Cref{fig:gcse_combined} shows how the degree of grade inflation varied across students with different prior academic scores, measured on the national GCSE scale\footnote{The GCSE is a nationally standardized exam that all students take before starting their secondary-school (16–18) education; mathematics, English Language, and English Literature are mandatory.}. I plot the average grade-inflation level across score bins for the two mandatory subjects (Mathematics and English Literature), where 9 is the highest and 3 is the lowest observed grade in the sample.
+
+In both subjects, the ordering of students' probabilities of receiving a top grade across score bins remained unchanged. However, I find differences in how top grades were assigned within classrooms by students' baseline GCSE scores. Specifically, in 2020 top A-level grades in Mathematics were concentrated among students with GCSE scores of 7–9. By contrast, the increase in the probability of receiving a top grade in English Literature was similar across students with different GCSE scores.
+
+This pattern is not solely driven by baseline differences in students' propensity to receive a top grade. Although students with higher GCSE scores already have higher baseline probabilities of obtaining a top A-level grade, the observed inflation reflects larger probability increases for high-GCSE students: top GCSE students experienced bigger increases in their chances of receiving a top grade than lower-GCSE students, even after accounting for baseline differences. \Cref{fig:GCSE_math_logit} presents the same relationship using log-odds differences in a student's probability of receiving a top grade. Inflation remains concentrated among students with high GCSE Mathematics scores in both 2020 and 2021.
+
+\Cref{fig:gcse_bySQ} shows how grading patterns across GCSE score bins vary by school quality. The figure plots the change in the probability of receiving a top A-level grade across GCSE score bins, standardized to the mean GCSE score (GCSE = 6). It also shows aggregated mean differences in inflation by school-quality groups; school quality is measured using the school fixed effects estimated from \Cref{eq:main} and then split into three bins.
+
+I find that lower-quality schools — defined as those below the 30th percentile of the school-quality measure — tended to inflate the grades of students with top GCSE scores in both Mathematics and English Literature more than higher-quality schools. On the GCSE Mathematics scale, the increase in the probability of receiving a top A-level grade is roughly proportional to the student's GCSE score, and this proportional pattern is similar across school-quality bins. On the English Literature scale, the increases are more uniform across score bins, but low-quality schools show relatively larger increases for students scoring 8 or 9 on the GCSE English Literature exam. These patterns are consistent in both 2020 and 2021.
+
+Demographic differences and students' economic affluence were also taken into account in grading. I find that female students had a higher probability of receiving a top grade than male students with similar academic and socioeconomic backgrounds (\Cref{tab:Demographics}). I also find that White students had a slightly higher probability of receiving a top grade than ethnic-minority students. Female students were about one percentage point more likely to receive a top grade than male students.
+
+\Cref{fig:gender_sq} plots how the gender grading bias varied by school-quality bins across the two pandemic years. Higher-quality schools were more likely to inflate female students' grades, whereas schools below the low-to-mid range of the quality distribution showed little gender-based difference. Schools in the middle of the quality distribution increased their gender grading bias in the second year, while low-quality schools did not show notable increases in gender differences.
+
+Teachers and schools awarded higher grades to students from more affluent backgrounds. \Cref{tab:Demographics} reports grading patterns using income-related measures. Panel A shows how grading varies by parental occupational class: students whose parents hold higher-income occupations (for example, managers or professionals) were more likely to receive a top grade than students whose parents work in elementary occupations. The difference in the probability of receiving a top grade between students with parents in elementary occupations and those with parents in occupations with only slightly higher average incomes (for example, caring or sales) is small and not statistically significant.
+
+The monotonic relationship between parental occupational income and the degree of inflation is stronger in lower-quality schools (\Cref{fig:income_SQ_combined}). I plot the average difference across parental occupational classes by school-quality bins; the bin-scatter shows that the correlation between parental income class and inflation is concentrated in low-quality schools. I do not observe a statistically significant relationship between parental income class and grade inflation in higher-quality schools.
+
+These patterns are confirmed using alternative measures of parental wealth, such as the average university-progression rate in a student's home area: students from regions with higher progression rates were assigned higher grades at low-quality schools, but not at high-quality schools.
+
+
+\subsection{Effect on student placement at universities}
+
+Did the extent of grade inflation differ for similar students with different application portfolios? To assess whether schools adjusted inflation depending on the universities students applied to, I test whether grade inflation differentially affected students' placement after conditioning on student and school attributes, but without controlling for application patterns.
+
+First I estimate whether student-level inflation predicts placement into a given course/program:
+\begin{align}
+\label{eq:placement1}
+Y^{*}_{i,j,s} &= X_{i}\beta \;+\; \gamma\,\mathrm{Infl}_{i}\;+\; \alpha_s \;+\; \kappa_{j} \;+\; u_{i,j,s},\\
+Y_{i,j,s} &= \mathbf{1}\{Y^{*}_{i,j,s} > 0\},
+\end{align}
+where \(Y_{i,j,s}\) indicates that student \(i\) from school \(s\) is placed into (or accepts) course/program \(j\); \(X_i\) contains the student's predicted grade from a standardized exam and other observables; \(\mathrm{Infl}_i\) is the student-level assigned-grade inflation (observed grade minus predicted grade); \(\alpha_s\) are school fixed effects; and \(\kappa_j\) are course/program fixed effects.
+
+Next I allow the effect of inflation to vary by school to test whether some schools tailor inflation to students' target universities:
+\begin{align}
+\label{eq:placement2}
+Y^{*}_{i,j,s} &= X_{i}\beta \;+\; \gamma\,\mathrm{Infl}_{i} \;+\; \delta_s\big(\mathrm{Infl}_{i}\times D_s\big) \;+\; \alpha_s \;+\; \kappa_{j} \;+\; u_{i,j,s},\\
+Y_{i,j,s} &= \mathbf{1}\{Y^{*}_{i,j,s} > 0\},
+\end{align}
+where \(D_s\) denotes a (school) indicator used to recover school-specific interaction effects and \(\delta_s\) captures how a marginal increase in \(\mathrm{Infl}_i\) at school \(s\) mechanically alters the student's probability of meeting the grade requirement for (or being placed into) higher-quality universities, above the average effect \(\gamma\).
+
+Identification of \(\delta_s\) exploits cross-student variation in \(\mathrm{Infl}_i\) conditional on covariates \(X_i\), school fixed effects \(\alpha_s\), and course fixed effects \(\kappa_j\). In practice I recover \(\delta_s\) by interacting \(\mathrm{Infl}_i\) with school indicators, so comparisons are made between students with different estimated inflation but otherwise similar observables within and across schools.
+
+Because I do not observe each student's counterfactual grade, I construct a predicted grade \(\hat{grade}_{i,2020}\) for each student using an elastic-net trained on pre-2020 outcomes, and define inflation as the realized minus predicted grade. I then regress this measure of inflation on students' observed tariff scores.\footnote{The prediction step \(\hat{grade}_{i,2020} = \mathcal{F}(X_i)\) uses a penalized regression,
+\[
+\hat\beta_\lambda
+=\arg\min_{\delta}\;
+\frac{1}{2n}\sum_{i\in\text{pre}}
+\big(y_i-X_i^\top\delta\big)^2
+\;+\;
+\lambda\!\left[
+\frac{1-\xi}{2}\,\|\delta\|_2^2 + \xi\,\|\delta\|_1
+\right],
+\]
+where \(\lambda>0\) is the tuning parameter and \(\xi\in[0,1]\) controls the \(\ell_1\)–\(\ell_2\) mix. This design isolates how much of the observed inflation can be attributed to students' position in the academic distribution while allowing the prediction step to flexibly incorporate a rich set of covariates \(X_i\).}
+
+\[
+\widehat{\mathrm{Infl}}_{i,2020}
+= grade_{i,2020} - \hat{grade}_{i,2020},
+\qquad
+\widehat{\mathrm{Infl}}_{i,2020}
+= \beta\,\mathrm{Tariff}_{i} + \varepsilon_{i,2020}.
+\]
+
+Here \(\mathrm{Tariff}_{i}\) denotes the student's observed tariff score (a summary of prior attainment). The coefficient \(\beta\) captures how inflation varies with students' position in the prior academic distribution.
+
+%I plot how the differences in institutional grading policies compare relative to average grading patterns related to the students academic and demographic attributes. \Cref{fig:gcse_vs_school} compares the shifts in students probability of receiving a top grade due to the between-school effects versus the within-school grading effect related to students academic ability. I find that in 2020 the impact of the grading policies across schools was larger than the influence of grading patterns across students underlying GCSE score distribution. However, the grading patterns across students by their GCSE scores had larger influence in shifting students from their baseline percentile point rank in probability to receive a top grade. Whereas the between school effect had lower impact on moving students across different percentile points in the overall grade distribution.
+
+
+\vspace{0.5em}
+
+I find that schools differed in how grade inflation affected students' chances of being placed at their firm-choice university. \Cref{fig:placement_sel} plots the marginal effect of a one-unit increase in assigned-grade inflation on the probability that a student from a given school is placed at their firm choice. In 2020, these marginal effects are largest for schools near the 20th, 55th, and 85th percentiles of the school-quality distribution. A simple linear regression of the marginal effect on school quality yields a positive coefficient in 2020, indicating that higher-quality schools extracted larger placement gains from inflation. By 2021, however, this positive correlation disappears (\Cref{tab:placement_main}).
+
+Furthermore, I decompose placement improvements by two grade-inflation channels: (i) school-specific inflation and (ii) grade changes induced by students' GCSE scores (and by the selectivity of the universities they apply to). \Cref{fig:placement_channel} presents bin-scatter plots of the marginal effect of a one-unit increase in assigned-grade inflation (separately for 2020 and 2021) on the probability of securing a place at a student's firm-choice university, decomposed into variation attributable to GCSE Mathematics scores and to the school's overall inflation level.
+
+The channels operate differently across years. In 2020, GCSE-induced grade increases translated into better placements mainly for schools in the middle of the quality distribution; the marginal effect for top-ranked schools was similar to that for schools at the bottom of the distribution despite differences in pupil composition. In 2021, however, the placement gains from GCSE-induced inflation rose for high-quality schools: the marginal probability of placement for high-quality schools was about 8 percentage points higher than for lower-quality schools. By contrast, the school-specific inflation channel lost relative influence in 2021 — its contribution to placement success declined in the second year.
+
+Regression results in \Cref{tab:placement_channel_table} corroborate these patterns. A one–percentage-point difference in school quality is associated with a decline in the placement payoff from school-level inflation, while within-school re-grading based on pupils' GCSE grades increases the probability of placement at higher-quality universities. In both years, the interaction coefficients on school quality are statistically significant, indicating that the effectiveness of each inflation channel systematically varies with school quality.
+
+Additionally, I decompose placement effects by the selectivity of the universities applicants target. \Cref{fig:placement_sel} plots the marginal effect of a one-unit increase in assigned-grade inflation on the probability of securing a place at a selective program and at a non-selective program; Panel A shows 2020 and Panel B shows 2021. In 2020 the placement impact of inflation is largest for schools near the 20th–30th percentile of the school-quality distribution. In 2021, the group of schools that gains the most shifts toward the middle of the distribution (roughly the 50th–60th percentiles): mid-rank schools led other schools in converting inflation into placements at students’ firm-choice programs.
+
+\Cref{tab:placement_selectivity_table} reports regression estimates of the probability of placing into a firm-choice program by the selectivity level of the target university. The point estimates show a weakly negative relationship between placement gains and school quality, but these coefficients are not statistically significant. Taken together with the bin-scatter in \Cref{fig:placement_sel}, the evidence suggests that mid-quality schools took greater advantage of grading discretion to improve their pupils’ placement outcomes. The conversion of grades into placements therefore does not follow a monotonic pattern: lower-quality schools generally did not succeed in pushing pupils into better programs, while mid-quality schools were most effective at using grade inflation to secure students’ firm-choice placements.

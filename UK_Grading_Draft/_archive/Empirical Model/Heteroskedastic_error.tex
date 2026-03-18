@@ -1,0 +1,151 @@
+
+\subsection{School-Level Inflation with an Anchor Equation}
+\label{sec:baseline_model}
+
+Let $Y_{i,j,k,t}$ be a binary indicator that equals 1 if student $i$ in school $j$, taking subject $k$ at time $t$, achieves an $A$ or $A^*$, and 0 otherwise. We assume there is an unobserved latent variable $Y_{i,j,k,t}^*$ such that
+\begin{equation}
+    \label{eq:indicator}
+    Y_{i,j,k,t}
+    \;=\;
+    \mathbf{1}\{Y_{i,j,k,t}^* \,\ge\, 0\}.
+\end{equation}
+
+\subsubsection*{Main Equation (Potentially Affected by Treatment)}
+
+We specify the latent index for our \emph{primary} outcome ($Y$) as follows:
+\begin{align}
+    \label{eq:latent_index}
+    Y_{i,j,k,t}^*
+    \;=\;& \beta_0 
+    \;+\;
+    \beta_1\,\text{Year2020}_t
+    \;+\;
+    \sum_{j}\alpha_j\,\text{School}_j 
+    \;+\;
+    \sum_{j}\delta_j\,\bigl(\text{School}_j \times \text{Year2020}_t\bigr)
+    \nonumber \\[-6pt]
+    &\;+\;\sum_{k}\gamma_k\,\text{Subject}_k
+    \;+\;
+    \sum_{l}\eta_{l}\,\text{GCSE}_{i,l,t}
+    \;+\;
+    \sum_{m}\zeta_m\,X_{i,m}
+    \;+\;
+    \sum_{n}\nu_n\,X_{j,n}
+    \;+\;
+    \varepsilon_{i,j,k,t},
+\end{align}
+where:
+\begin{itemize}
+    \item \(\text{Year2020}_t = 1\) if $t=2020$ (pandemic year), and 0 otherwise,
+    \item \(\text{School}_j\) is a set of school fixed effects (one for each school \(j\)),
+    \item \(\text{School}_j \times \text{Year2020}_t\) allows each school’s effect to differ in 2020,
+    \item \(\text{Subject}_k\) are subject fixed effects (one for each subject \(k\)), 
+    \item \(\text{GCSE}_{i,l,t}\) are dummy variables for the student’s GCSE performance (e.g., by grade bins) in required subjects,
+    \item \(X_{i,m}\) are additional student-level controls (e.g., gender, race, SES),
+    \item \(X_{j,n}\) are additional school-level controls (e.g., school type, quality),
+    \item \(\varepsilon_{i,j,k,t}\) is the error term, which we allow to be \emph{heteroskedastic} (see below).
+\end{itemize}
+Here, $\delta_j$ measures the *incremental* effect of being in school $j$ \emph{during} 2020 (relative to that school’s baseline).
+
+\subsubsection*{Anchor Equation (Unaffected by Treatment)}
+
+To aid identification of the GCSE slopes \(\eta_l\) (i.e., their absolute scale), we include a \emph{secondary} binary outcome $W_{i,j,t}$ that is ex-ante \emph{unaffected} by the treatment/pandemic grading policy. Denote the latent variable $W_{i,j,t}^*$, with
+\[
+    W_{i,j,t} \;=\; \mathbf{1}\{W_{i,j,t}^* \,\ge\, 0\}.
+\]
+We assume:
+\begin{align}
+\label{eq:anchor_index}
+    W_{i,j,t}^*
+    \;=\;
+    \lambda_0
+    \;+\;
+    \sum_{l}\underbrace{\eta_{l}}_{\text{same GCSE slope}}\,\text{GCSE}_{i,l,t}
+    \;+\;
+    \sum_{r}\omega_r\,Z_{i,j,r}
+    \;+\;
+    \varepsilon_{i,j,t}^{(w)},
+\end{align}
+where
+\begin{itemize}
+    \item We \textbf{force} the GCSE coefficients in \eqref{eq:anchor_index} to be the \emph{same} \(\eta_l\) as in \eqref{eq:latent_index}, ensuring a common scale for these controls.
+    \item $Z_{i,j,r}$ are additional covariates relevant for the anchor outcome but \emph{not} necessarily tied to the treatment.
+    \item We assume $\varepsilon_{i,j,t}^{(w)} \sim N(0,\;\sigma_{w,j,t}^2)$; possibly heteroskedastic in a similar or simpler fashion.
+    \item Critically, $W_{i,j,t}$ is not altered by $\text{Year2020}_t$ or $\delta_j$; that is, \(\text{Year2020}_t\) does \emph{not} enter \eqref{eq:anchor_index}, ensuring $W$ is an “anchor” unaffected by treatment.
+\end{itemize}
+
+\subsection{Estimating School-Specific Grade Inflation}
+
+We continue to define *grade inflation* for school $j$ as the change in the predicted probability of an $A$ (or $A^*$) between the baseline (non-pandemic) period and the pandemic year 2020, holding student and school characteristics constant. Specifically, once we estimate all parameters in \eqref{eq:latent_index} and \eqref{eq:anchor_index} via maximum likelihood, we compute:
+\begin{equation}
+\label{eq:grade_inflation}
+\theta_j \;=\;
+\Pr\bigl(Y=1 \mid \text{Year2020}=1,\;\text{School}=j,\;\overline{X}\bigr)
+\;-\;
+\Pr\bigl(Y=1 \mid \text{Year2020}=0,\;\text{School}=j,\;\overline{X}\bigr),
+\end{equation}
+where $\overline{X}$ denotes a chosen reference vector of student and school characteristics. Since we use a probit link (see below), the predicted probability is
+\[
+\Pr(Y=1 \mid X) \;=\; \Phi\Bigl(\tfrac{X\hat{\beta}}{\sigma_i}\Bigr),
+\]
+where $\Phi(\cdot)$ is the standard normal CDF and $X\hat{\beta}/\sigma_i$ arises from \eqref{eq:latent_index}.
+
+\subsection{Heteroskedastic Probit Estimation with a Joint Likelihood}
+
+We estimate the parameters of both the \emph{main equation} \eqref{eq:latent_index} and the \emph{anchor equation} \eqref{eq:anchor_index} jointly via a \textbf{heteroskedastic probit} framework, allowing $\sigma_{j,t}$ to vary by school and year in the main equation, and similarly $\sigma_{w,j,t}$ for the anchor equation if needed:
+\[
+    \varepsilon_{i,j,k,t} = \sigma_{j,t}\,u_{i,j,k,t},\quad
+    \varepsilon_{i,j,t}^{(w)} = \sigma_{w,j,t}\,u_{i,j,t}^{(w)},
+    \quad
+    u_{i,j,k,t},\,u_{i,j,t}^{(w)} \,\sim\, N(0,\,1).
+\]
+One might specify, for instance:
+\[
+    \sigma_{j,t} \;=\;\exp(Z_{j,t}\,\gamma),
+    \quad
+    \sigma_{w,j,t} \;=\;\exp(Z_{w,j,t}\,\gamma_w),
+\]
+with separate or overlapping covariates $Z_{j,t}$ and $Z_{w,j,t}$. 
+
+\subsubsection*{Joint Log-Likelihood}
+Define the observation-level contributions to each equation:
+\[
+\ell_Y(\beta,\gamma)
+=
+\sum_{i=1}^n
+\Bigl[
+Y_{i}\,\ln \Phi\!\Bigl(\tfrac{X_i\beta}{\sigma_i}\Bigr)
+\;+\;
+(1 - Y_{i}) \,\ln \Bigl(1 - \Phi\!\bigl(\tfrac{X_i\beta}{\sigma_i}\bigr)\Bigr)
+\Bigr],
+\]
+\[
+\ell_W(\eta,\omega,\gamma_w)
+=
+\sum_{i=1}^n
+\Bigl[
+W_{i}\,\ln \Phi\!\Bigl(\tfrac{X_i^{(w)}\tilde{\beta}}{\sigma_{w,i}}\Bigr)
+\;+\;
+(1 - W_{i}) \,\ln \Bigl(1 - \Phi\!\bigl(\tfrac{X_i^{(w)}\tilde{\beta}}{\sigma_{w,i}}\bigr)\Bigr)
+\Bigr],
+\]
+where $X_i^{(w)}\tilde{\beta}$ includes the \(\eta_l\) terms (shared with the main equation’s GCSE slopes) plus additional $\omega_r$ parameters for $Z_{i,j,r}$. The total joint log-likelihood is:
+\[
+\mathcal{L}(\beta,\gamma,\eta,\omega,\gamma_w)
+\;=\;
+\ell_Y(\beta,\gamma)
+\;+\;
+\ell_W(\eta,\omega,\gamma_w),
+\]
+subject to the constraint that \(\eta_l\) in the anchor equation is the same as \(\eta_l\) in \eqref{eq:latent_index}. Maximizing $\mathcal{L}$ gives the parameter estimates $(\hat{\beta},\hat{\gamma},\hat{\eta},\hat{\omega},\hat{\gamma}_w)$, from which we compute school-specific inflation $\theta_j$ as in~\eqref{eq:grade_inflation}.
+
+\bigskip
+\noindent
+\textbf{Remarks.}
+\begin{itemize}
+    \item This two-equation structure ensures that the \emph{GCSE slope parameters} $\eta_l$ are identified on a common scale between an \emph{unaffected} outcome (the anchor) and the \emph{treatment-affected} outcome ($Y$). 
+    \item The heteroskedastic components $\sigma_{j,t}$ and $\sigma_{w,j,t}$ can thus be separated more cleanly from $\eta_l$, improving identification and interpretability of $\delta_j$ (the school-specific 2020 effect).
+    \item If the anchor outcome $W_{i,j,t}$ is truly invariant to the 2020 treatment, it provides a stable “reference” to pin down how GCSE performance influences latent scores absent treatment-induced scaling changes.
+\end{itemize}
+
+\subsection{Simulation for school fixed effects}

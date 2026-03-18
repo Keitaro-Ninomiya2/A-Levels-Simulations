@@ -1,0 +1,83 @@
+% requires: \usepackage{booktabs,threeparttable,array}
+\begin{table}[htbp]
+\centering
+\caption{Descriptive regression on persistence of grade inflation}
+\label{tab:dynamics}
+\begin{threeparttable}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.02}
+
+% adjust these if you want slightly different spacing
+\newcommand{\labwidth}{0.30\textwidth}   % width of the left label column
+\newcommand{\colw}{0.11\textwidth}      % width of each of the six numeric subcolumns
+% note: labwidth + 6*colw should be <= \textwidth
+
+\begin{tabular}{@{}p{\labwidth}*{6}{>{\centering\arraybackslash}p{\colw}}@{}}
+\multicolumn{7}{@{}l}{\textbf{Panel A: Dynamics between 2021 and 2020}} \\[4pt]
+
+\toprule
+ & \multicolumn{2}{c}{\textbf{A}} 
+ & \multicolumn{2}{c}{\textbf{A*}} 
+ & \multicolumn{2}{c}{\textbf{B}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & \multicolumn{2}{c}{\textbf{(1)}} & \multicolumn{2}{c}{\textbf{(2)}} & \multicolumn{2}{c}{\textbf{(3)}} \\
+\cmidrule(lr){2-7}
+
+Inflation in 2020 
+ & \multicolumn{2}{c}{0.624***} 
+ & \multicolumn{2}{c}{0.454***} 
+ & \multicolumn{2}{c}{1.018***} \\
+
+ & \multicolumn{2}{c}{(0.022)} 
+ & \multicolumn{2}{c}{(0.024)} 
+ & \multicolumn{2}{c}{(0.009)} \\[4pt]
+
+\midrule
+
+Num. Obs. 
+ & \multicolumn{2}{c}{1890} & \multicolumn{2}{c}{1869} & \multicolumn{2}{c}{1869} \\
+
+R$^2$
+ & \multicolumn{2}{c}{0.302} & \multicolumn{2}{c}{0.157} & \multicolumn{2}{c}{0.875} \\
+
+\addlinespace[8pt]
+\midrule[\heavyrulewidth]
+
+\multicolumn{7}{@{}l}{\textbf{Panel B: Decomposition by subject type}} \\[4pt]
+\midrule
+ & \textbf{(1)} & \textbf{(2)} 
+ & \textbf{(3)} & \textbf{(4)} 
+ & \textbf{(5)} & \textbf{(6)} \\
+\midrule
+ & \textbf{Q} & \textbf{NQ} 
+ & \textbf{Q} & \textbf{NQ} 
+ & \textbf{Q} & \textbf{NQ} \\
+\midrule
+
+Inflation in 2020 + Non-Quant 
+ & 0.036**  & 0.507*** & -0.023  & 0.296*** & 0.287*** & 0.537*** \\
+ & (0.016) & (0.023) & (0.033) & (0.023) & (0.022) & (0.018) \\[4pt]
+
+Inflation in 2020 + Quant   
+ & 0.225*** & -0.020  & 0.393*** & -0.007 & 0.744*** & 0.311*** \\
+ & (0.023) & (0.034) & (0.025) & (0.017) & (0.019) & (0.016) \\
+
+\addlinespace[6pt]
+\midrule
+
+Num. Obs.
+ & 1863 & 1869 & 1846 & 1852 & 1852 & 1846 \\
+
+R$^2$ 
+ & 0.047 & 0.210 & 0.100 & 0.141 & 0.695 & 0.649 \\
+
+\bottomrule
+\end{tabular}
+\noindent\begin{minipage}{\textwidth}
+\footnotesize
+\textbf{Notes:} The table reports the regression coefficient that regresses the inflation measure defined in \Cref{eq:main} on the measure of school quality, the school type dummy variable, and the interaction of the two variables. Degree of inflation is measured as the average marginal effect (AME) at the school level, in which I calculates the average marginal effect of the school inflation for all students within the school. Namely, the latent scores of each students without the inflation effects are calculated by mapping the student attributes on the fixed effect coefficient in \Cref{eq:main}. Before the AME is calculated, I apply the shrinkage correction method by \cite{b933f52e-83fe-34bb-bf19-f7f3e5459001}.School quality is defined as the fixed effect derived from \Cref{eq:main}. The school fixed effect is evaluated by calculating the probability of obtaining A or A* for the nationally representative student, which I define as the student with median values in their continuous or categorical variables. School fixed effects are corrected for the incidental parameter bias by using methods by \cite{FERNANDEZVAL2016291}
+. Schools without less than 30 students in both 2020 and 2021 taking A-level exams are dropped from the regression. Column 1 and 2 uses A, Column 3 and 4 uses A*, and Column 5 and 6 uses B as the binary dependent variable for estimating \Cref{eq:main}.  Bootstrapped standard errors at obtained by blocking at the school level. + $p<0.1$, * $p<0.05$, ** $p<0.01$, *** $p<0.001$.
+\end{minipage}
+\end{threeparttable}
+\end{table}

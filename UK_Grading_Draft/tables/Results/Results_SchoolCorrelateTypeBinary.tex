@@ -1,0 +1,38 @@
+\begin{table}[ht]
+\centering
+\caption{Regression Table} \label{tab:regression}
+\begin{threeparttable}
+\begin{tabular}{lllll}
+\toprule
+\midrule
+& \multicolumn{2}{c}{Standardized Grade} & \multicolumn{2}{c}{A or A*} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} 
+ & (1)       & (2)       & (3)     & (4) \\
+\midrule
+Furth. Ed. & -0.072** & -0.002   & -0.196   & 0.044*   \\
+           & (0.028)   & (0.017)   & (0.141)   & (0.019)   \\
+Grammar & -0.023   & 0.035*   & 0.394**  & 0.030    \\
+        & (0.027)   & (0.016)   & (0.137)   & (0.019)   \\
+Indep.  & 0.115*** & 0.060*** & 0.580*** & 0.005    \\
+        & (0.020)   & (0.012)   & (0.101)   & (0.014)   \\
+moOther   & -0.008   & 0.078    & -0.151   & 0.104    \\
+        & (0.103)   & (0.063)   & (0.524)   & (0.072)   \\
+Sixth Form & -0.012   & -0.062*** & -0.235*  & -0.036** \\
+           & (0.018)   & (0.011)   & (0.092)   & (0.013)   \\
+State   & 0.015    & 0.006    & 0.048    & 0.002    \\
+        & (0.010)   & (0.006)   & (0.052)   & (0.007)   \\
+\midrule
+Model   & Tobit    & OLS      & Probit   & OLS      \\
+Estimation & MLE & MLE & MLE & MLE \\
+Num.Obs.& 2676     & 2676     & 2669     & 2676    \\
+R2 Adj. & 0.355    & 0.225    & 0.107    & 0.348   \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+    \footnotesize
+    \item[*] Notes: Standard errors are in parentheses. ***, **, and * denote significance at the 1\%, 5\%, and 10\% levels, respectively.
+    \item Estimates are obtained  by regressing school level treatment effects, derived from the specification denoted in $\mathbf{Model}$, on school level attributes. 
+    \item Estimates for Tobit and Probit are not the marginal effects, but the estimated coefficients.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}

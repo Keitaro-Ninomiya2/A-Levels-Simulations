@@ -1,0 +1,116 @@
+\begingroup
+\setlength{\floatsep}{6pt}
+\setlength{\textfloatsep}{6pt}
+\setlength{\intextsep}{6pt}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{0.95}
+\captionsetup[table]{skip=3pt}
+
+% ----- First table: includes column numbers and caption -----
+\begin{table}[!htbp]
+\centering\scriptsize
+\caption{Grading bias across demographics by school quality}
+\begin{threeparttable}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{(1)} & \textbf{(2)} \\
+\midrule
+Gender $\times$ SQ & -0.006 & 0.281\textsuperscript{***} \\
+ & (0.078) & (0.082) \\
+\midrule
+Num.Obs. & \multicolumn{2}{c}{1818 \quad 1824} \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+\vspace{-6pt}
+
+% ----- Subsequent tables: no column numbers -----
+\begin{table}[!htbp]
+\centering\scriptsize
+\begin{threeparttable}
+\begin{tabular}{lcc}
+\toprule
+Ethnic $\times$ SQ  & 0.062 & -0.175\textsuperscript{+} \\
+ & (0.064) & (0.105) \\
+\midrule
+Num.Obs. & \multicolumn{2}{c}{1838 \quad 1855} \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+\vspace{-6pt}
+
+\begin{table}[!htbp]
+\centering\scriptsize
+\begin{threeparttable}
+\begin{tabular}{lcc}
+\toprule
+SES Class2 $\times$ SQ& -0.084 & -0.034 \\
+ & (0.193) & (0.130) \\
+SES Class3 $\times$ SQ& 0.155 & 0.190 \\
+ & (0.155) & (0.156) \\
+SES Class4 $\times$ SQ& 0.165 & 0.202 \\
+ & (0.174) & (0.185) \\
+SES Class5 $\times$ SQ& 0.399\textsuperscript{*} & 0.264 \\
+ & (0.180) & (0.199) \\
+SES Class6 $\times$ SQ& 0.367\textsuperscript{*} & 0.182 \\
+ & (0.162) & (0.189) \\
+SES Class7 $\times$ SQ& 0.331\textsuperscript{+} & 0.579\textsuperscript{**} \\
+ & (0.196) & (0.218) \\
+SES Class9 $\times$ SQ& 0.033 & 0.204 \\
+ & (0.128) & (0.126) \\
+\midrule
+Num.Obs. & \multicolumn{2}{c}{13997 \quad 14006} \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+\vspace{-6pt}
+
+\begin{table}[!htbp]
+\centering\scriptsize
+\begin{threeparttable}
+\begin{tabular}{lcc}
+\midrule
+IMD Quantile 1 $\times$ SQ& 0.001 & 0.355\textsuperscript{*} \\
+ & (0.154) & (0.157) \\
+IMD Quantile 2 $\times$ SQ& 0.286\textsuperscript{*} & 0.040 \\
+ & (0.136) & (0.131) \\
+IMD Quantile 3 $\times$ SQ& 0.208\textsuperscript{+} & 0.286\textsuperscript{*} \\
+ & (0.113) & (0.119) \\
+IMD Quantile 4 $\times$ SQ& 0.317\textsuperscript{**} & 0.175\textsuperscript{+} \\
+ & (0.115) & (0.103) \\
+\midrule
+Num.Obs. & \multicolumn{2}{c}{8719 \quad 8759} \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+\vspace{-6pt}
+
+\begin{table}[!htbp]
+\centering\scriptsize
+\begin{threeparttable}
+\begin{tabular}{lcc}
+\midrule
+POLAR Quantile 1 $\times$ SQ& 0.452\textsuperscript{*} & -0.040 \\
+ & (0.199) & (0.199) \\
+POLAR Quantile 2 $\times$ SQ& 0.163 & 0.148 \\
+ & (0.172) & (0.204) \\
+POLAR Quantile 3 $\times$ SQ& -0.074 & -0.172 \\
+ & (0.149) & (0.171) \\
+POLAR Quantile 4 $\times$ SQ& -0.068 & -0.162 \\
+ & (0.151) & (0.156) \\
+\midrule
+Num.Obs. & \multicolumn{2}{c}{8061 \quad 8162} \\
+\bottomrule
+\end{tabular}
+\end{threeparttable}
+\end{table}
+
+\begin{center}\scriptsize
+Notes: standard errors in parentheses. $+ p<0.1$, $* p<0.05$, $** p<0.01$, $*** p<0.001$.
+\end{center}
+
+\endgroup

@@ -1,0 +1,256 @@
+
+\subsection{Empirical Specification and Estimation}
+I estimate a binary choice model that measures how teachers/schools differentially reacted to the grading method by exerting different grading leniency.  Namely, I estimate
+\[
+Y_{i,j,k,t} \;=\; \mathbf{1}\{Y_{i,j,k,t}^* \ge 0\}.
+\]
+\begin{align}
+    \label{eq:main}
+    Y_{i,j,k,t}^*
+    \;=\;\alpha_j\ 
+    \;+\; 
+    X_i\eta
+    \;+\;
+    \gamma_{k} 
+    \;+\;
+    \sum_{\tau\in \{2020, 2021\}}D_\tau\times\left(\Delta\alpha_{j,\tau}\ 
+    \;+\;
+    X_i\Delta\eta_{\tau}
+    \;+\;
+    \Delta\gamma_{k,\tau} \right),
+\end{align}
+
+where $i$ denotes a student, $j$ denotes the school, $k$ denotes the exam subject, and $t$ denotes a year. The outcome variable $Y_{i,j,k,t}$ is a binary variable for student $i$'s exam outcome at year $t$ measuring if he/she received a top grade (A or A*). $\alpha_j$ is the school fixed effects. $X_i$ is a vector of student level controls (Previous scores in a national standardized exam (GCSE), gender, race, and socio-economic group). $D_\tau$ is a dummy variable for the treatment indicator, which distinguishes between both 2020 and 2021.  $\Delta \alpha_{j,\tau}, \Delta \eta_{\tau}, \Delta \gamma_{k,\tau}$ measures the coefficient on the interaction term between the school fixed effect and the treatment year indicator. 
+
+\Cref{eq:main} identifies the causal effect of the grading method, namely the difference in grades due to the grading scheme, for each student by measuring the deviation in the final grade trajectory relative to non-pandemic years for a given school/student body. The grading leniency of a school ($\Delta\alpha_j$) measures how much a schools' average probability of their pupils receiving a top grade changed in year $t$. To control for compositional difference across schools in a COVID year, the model includes the interaction term between the pandemic year dummy and student level controls. In order to compare students \emph{across cohorts} within a school with similar academic and demographic background, \Cref{eq:main} includes school fixed effects and also controls on the students' academic and socio-economic backgrounds. \Cref{eq:main} also include subject fixed effects to control for different exam course availability across schools.  
+
+The identification of $\Delta\alpha_j$ relies on the stability of the mapping between student characteristics and grades over time. I formalize this identification condition as follows.
+
+\vspace{0.5em}
+
+\noindent \textbf{Assumption 1 (Conditional Stationarity).} The expected grade for student $i$ is stationary conditional on observed controls $X$ if, for any observed period $t$ and reference period $t^{\prime}$, the following mean independence condition holds:
+\begin{equation}
+    \label{eq:stationary}
+    E[\ell_{i,j,k,t} \mid X_{t}, Standardized] = E[\ell_{i,j,k,t^{\prime}} \mid X_{t^{\prime}}, Standardized]
+\end{equation}
+
+\noindent \Cref{eq:stationary} requires that the historical information on grade distributions over previous years sufficiently estimates the probability distribution for a given year without observing the actual grade distribution but just the student level covariates. Satisfaction of \Cref{eq:stationary} ensures that the deviation in the grade distribution due to an external factor can be attributed to the intervention. 
+
+The British examiners' grading rule ensures that \Cref{eq:stationary} is satisfied throughout the years in which the standard A-levels were taken. The central exam boards of the A-levels re-draws the grade boundaries each year by ensuring the grade distribution remains constant with their historical levels after controlling for the test-taking populations' academic achivements, which is measured by a separate set of standardized tests (the \emph{General Certificate of Secondary Education}\footnote{GCSE}). By using the GCSE scores of the test taking population for each exam subject, the test takers ensure that the share of students receiving each letter grade is consistent across previous years.
+
+To establish the stationarity of the overall grade distribution of the A-levels before the pandemic years, I conduct a series of stationarity tests. I first estimate the conditional mean probability of a student receiving an top grade (A or A*) by estimating the following equation.
+\[
+Y_{i,t} = \beta_0 
++ \sum_{\substack{\tau = t_{\min} \\ \tau \neq t_0}}^{t_{\max}}
+    \beta_{\tau} \, \mathbf{1}\{t = \tau\}
++ X_i' \gamma
++ \varepsilon_{i,t},
+\]
+$\beta$ denotes the conditional average probability of a student to achieve an A or A* in their A-level exams. 
+
+\Cref{fig:event_study} plots the conditional average probabilities from 2015 to 2021. The difference in the conditional average probabilities is statistically insignificant. The difference between mean probability of obtaining top grades (A/A*) between 2015 to 2018 are statistically insignificant from 2019, but increases to 0.5 in the logit model coefficient in in 2020 and 7.0 in 2021\footnote{The slight increase in the probability of receiving top grades in 2019 is driven by the rescalling of the GCSE scores that was conducted in 2017.}. I show how the average probability in receiving top grade is constant up until 2019 for each school types that composes the overall estimate (\Cref{fig:event_study_type}) are all similar to the probability to the predicted levels in 2019.  
+
+Identification of the schools' inflation behaviors in \Cref{eq:main} also hinges on the composition of students not getting affected by the grading method switch. We formalize this as an orthogonality condition between student attributes and the policy regime.
+
+\vspace{0.5em}
+
+\noindent \textbf{Assumption 2 (Exogeneity of Student Composition).} The grading policy indicator $D_t$ is independent of both observed student characteristics $X$ and unobserved heterogeneity $\varepsilon$:
+\begin{equation}
+\label{eq:composition}
+    (X, \varepsilon) \perp D_{t}
+\end{equation}
+\noindent \Cref{eq:composition} requires how student composition remained unaffected for the pandemic year, especially across schools or exam courses. 
+
+\Cref{eq:composition} is satisfied by how all students that took the A-levels during the pandemic year had decided their test taking subjects well before the policy was announced. A-level takers choose their test taking subjects when they start their 16-18 education curriculum by choosing a set of subjects\footnote{Usually 4}, so for both pandemic year cohorts the students exam choice was determined before the pandemic occurred. 
+
+Any sorting of students across schools due to the pandemic is strongly implausible due to the unpredictability of the pandemic, as the students had already made their decisions on which schools to attend to prepare for their A-levels. \Cref{tab:balance} tests for the difference across cohort characteristics between a pandemic year and a non-pandemic year and finds no significant difference between cohort characteristics for both years. 
+
+\Cref{eq:composition} also warrants that the students' learning experience during COVID was unaffected. A majority of A-level takers finish preparing for their exams before March, and use the remaining 3 month to prepare for their exams through recital classes. As the policy announcement occurred in April 2020 and school closures were announced in March 2020, the majority of students had already finished their education curriculum when the schools and teachers were issuing the final grades. However, the 2021 cohorts were affected by the pandemic, as students at schools ill-equipped to conduct remote learning suffered from learning disruption. Therefore my results for the 2021 cohorts serves as a lower bound on the effect of the grading policy on the final grades. 
+
+Although \Cref{eq:main} is robust to underlying pre-trends and unobserved differences in students characteristics across the treatment dummy, the final concern is that teachers may take into account how students suffered in their learning experiences during the pandemic into their grading. Past literature ( \cite{diamond} , \cite{ferman2022}) documents how teachers may take into account the exam taking conditions of the students into the students final grades.  The learning disruption is less of a concern for the 2020 samples in my setup as these students had already finished most of their preparation for the exams, and teachers had immense experience with teaching the students before the pandemic occurred. To establish that the estimated changes in grades for 2020 is largely due to grading method changes, I conduct a series of place-bo tests on the results of standardized foreign exams conducted during the pandemic years. Many UK higher education institutions allow students to use standardized foreign exams outside the A-level qualifications to allow foreign students to study at their universities. \Cref{fig:placebo} reports the difference in the average grades of the non-A-level standardized tests for 2020 against 2019, and it confirms that the learning loss for the 2020 year cohort was minimal. 
+
+However, I can not strongly reject the possibility that the learning loss's for the 2021 cohorts may confound the effect of grading change with disruptions in the learning environments due to the shutdown during the pandemic year. Especially, the cross school differences in grading policies may reflect the differences in learning environment disruptions, as schools may differed in their ability to compensate for the lack of in-person classes by providing online courses. Despite the caveats for the school level difference in grading policies, I claim that the student level estimates are less prone to differences in learning losses across demographic groups.  \Cref{eq:main} estimates the differences across demographic groups by comparing across students sharing the same subject course. 
+
+\subsection{Estimation}
+I estimate the parameters by searching for the set of estimates that maximizes the joint likelihood function of the observed dependent variable (e.g. students achieving A or A*). The joint likelihood function is expressed as the following;
+\[
+\mathcal{L}(\theta)
+=
+\prod_{i,j,k,t}
+\left[
+    F\!\left( z_{i,j,k,t} \right)^{Y_{i,j,k,t}}
+    \;
+    \left[ 1 - F\!\left( z_{i,j,k,t} \right) \right]^{1 - Y_{i,j,k,t}}
+\right],
+\]
+where,
+\[
+z_{i,j,k,t} \;=\;
+\alpha_j
++ X_i \eta
++ \gamma_k
++ \sum_{\tau \in \{2020,2021\}}
+    D_\tau
+    \left(
+        \Delta\alpha_{j,\tau}
+        + X_i \Delta\eta_{\tau}
+        + \Delta\gamma_{k,\tau}
+    \right),
+\]
+and $F$ denotes the cumulative density function of the logistic function. I estimate the parameters that maximize the logged function; 
+\[
+\ell(\theta)
+=
+\sum_{i,j,k,t}
+    Y_{i,j,k,t} \log F\!\left( z_{i,j,k,t} \right)
+    +
+    \left( 1 - Y_{i,j,k,t} \right)
+    \log\left[ 1 - F\!\left( z_{i,j,k,t} \right) \right].
+\]
+
+%[Separation issues; I expand the model to an ordinal logit]
+
+I take an empirical Bayes approach (\cite{WALTERS2024183}, \cite{b933f52e-83fe-34bb-bf19-f7f3e5459001}) to correct for the estimation noise related to the school fixed effects $\alpha_j, \Delta\alpha_j$. I assume that the school effects are drawn from a common distribution with separate variance parameters.
+
+\[\alpha_j \sim \mathcal{N}(0,\sigma_{\alpha}^2),\ \Delta\alpha_{j,\tau} \sim \mathcal{N}(0,\sigma_{\Delta\alpha,\tau}^2)\]
+$\sigma_{\alpha}^2, \sigma_{\Delta\alpha,\tau}^2)$ measures the variance of the common distribution. Following \cite{b933f52e-83fe-34bb-bf19-f7f3e5459001} and \cite{10.1093/qje/qjab017} I correct the school level estimators with the following formula;
+\[
+\widehat{\alpha}^{\,EB}_j
+=
+\frac{\widehat{\sigma}^2_{\alpha}}
+{\widehat{\sigma}^2_{\alpha} + \widehat{\mathrm{SE}}(\widehat{\alpha}_j)^{\,2}}
+\;\widehat{\alpha}_j,
+\quad
+\widehat{\Delta\alpha}^{\,EB}_{j,\tau}
+=
+\frac{\widehat{\sigma}^2_{\Delta\alpha,\tau}}
+{\widehat{\sigma}^2_{\Delta\alpha,\tau} + \widehat{\mathrm{SE}}(\widehat{\Delta\alpha}_{j,\tau})^{\,2}}
+\;\widehat{\Delta\alpha}_{j,\tau},
+\]
+$\widehat{\sigma}^2_{\Delta\alpha,\tau}$ denotes the estimate of the variance of the common distribution, which I calculate as the following.
+\[
+\widehat{\sigma}^2_{\Delta\alpha,\tau}
+=
+\max\left\{
+    0,\;
+    \mathrm{Var}_j\!\left( \widehat{\Delta\alpha}_{j,\tau} \right)
+    - \overline{\mathrm{SE}\!\left( \widehat{\Delta\alpha}_{j,\tau} \right)^{2}}
+\right\}.
+\]
+$\widehat{\mathrm{SE}}(\widehat{\Delta\alpha}_{j,\tau})^{\,2}$ measures the estimated sampling variance of the school fixed effects\footnote{I solve for the estimates that maximizes the likelihood function with a quasi-Newton approach. As the sample size and the number of parameters is large, a standard Newton-Raphson solver does not scale well, as the calculation of the Hessian matrix takes time. Instead the L-BFGS method, which is a quasi-Newton approach, approximates the Hessian using past information that reduces the computation time significantly (\cite{GVK502988711}). I derive the standard errors of the estimates by clustering at the school year level. }. 
+
+
+\noindent
+\textbf{School Specific grading pattern of students} \Cref{eq:main} estimates the grading pattens across demographic groups by estimating the average difference in students tendency to receiving a top grade over schools. I extend the model into \Cref{eq:main_ext} so that I estimate grading patterns across demographic groups seperatly for each schools. Namely I augment the interaction term $X_i\Delta\eta_{\tau}$ so that the treatment response to observed demographics is school-specific. Let $\mathcal{G}$ index a set of demographic groups (e.g. gender, race, SES bins) and denote by $d_{i,g}$ the indicator (or normalized score) for student $i$ belonging to group $g\in\mathcal{G}$. I replace the common demographic treatment vector $\Delta\eta_{\tau}$ with school-by-group parameters $\{\Delta\eta_{g,j,\tau}: g\in\mathcal{G},\, j\in\mathcal{J}\}$ and write the latent index as
+\begin{equation}\label{eq:main_ext}
+    z_{i,j,k,t}
+=
+\alpha_j
++ X_i \eta
++ \gamma_k
++ \sum_{\tau\in\{2020,2021\}} D_\tau
+\Big(
+    \Delta\alpha_{j,\tau}
+    \;+\;
+    \sum_{g\in\mathcal{G}} d_{i,g}\,\Delta\eta_{g,j,\tau}
+    \;+\;
+    \Delta\gamma_{k,\tau}
+\Big),
+\end{equation}
+
+so that the treatment effect on students in demographic group $g$ at school $j$ in year $\tau$ is captured by $\Delta\eta_{g,j,\tau}$. The binary outcome and likelihood remain as in the main specification with $F$ the logistic CDF.
+
+Because the number of school–group parameters can be large and some school–group cells have few observations, I impose a hierarchical (partial-pooling) prior on the school–specific demographic effects and estimate this empirically (empirical Bayes). Concretely,
+\[
+\Delta\eta_{g,j,\tau} \;\sim\; \mathcal{N}\!\big(\mu_{g,\tau},\;\sigma^2_{g,\tau}\big),
+\qquad
+\mu_{g,\tau}\in\mathbb{R},\; \sigma^2_{g,\tau}\ge 0,
+\]
+so that estimates for small or noisy cells are shrunk toward the group-level mean $\mu_{g,\tau}$. The empirical Bayes shrinkage estimator has the closed form (posterior mean under Gaussian approximations)
+\[
+\widehat{\Delta\eta}^{\,EB}_{g,j,\tau}
+=
+w_{g,j,\tau}\,\widehat{\Delta\eta}_{g,j,\tau}
+\;+\;
+\big(1-w_{g,j,\tau}\big)\,\widehat{\mu}_{g,\tau},
+\qquad
+w_{g,j,\tau}
+=
+\frac{\widehat{\sigma}^2_{g,\tau}}
+     {\widehat{\sigma}^2_{g,\tau} + \widehat{\mathrm{SE}}\!\big(\widehat{\Delta\eta}_{g,j,\tau}\big)^{2}},
+\]
+where $\widehat{\Delta\eta}_{g,j,\tau}$ and $\widehat{\mathrm{SE}}(\widehat{\Delta\eta}_{g,j,\tau})$ are the raw (maximum likelihood) estimates and their sampling standard errors, and $\widehat{\mu}_{g,\tau},\widehat{\sigma}^2_{g,\tau}$ are estimated from the cross-school empirical distribution. As before, I estimate the variance component by the usual nonnegative deconvolution
+\[
+\widehat{\sigma}^2_{g,\tau}
+=
+\max\!\Big\{0,\;
+    \mathrm{Var}_j\!\big(\widehat{\Delta\eta}_{g,j,\tau}\big)
+    - 
+    \overline{\mathrm{SE}\!\big(\widehat{\Delta\eta}_{g,j,\tau}\big)^{2}}
+\Big\}.
+\]
+
+
+\subsection{Discussion on the empirical model}
+My model is similar to the approach used by \cite{10.1162/00335530360698441} \cite{neal2008} and \cite{dee2019} in which researcher leverage the sudden change in grading policies and use the discrepancy between the predicted grades and the actual grades to measure the grading bias\footnote{Other papers uses grading systems in which teachers provide grades on the students along side a externally graded exams (\cite{lavy2009}\cite{lavy2018}, \cite{ferman2022}).}. The magnitudes in the grade discrepancies are averaged over students with different demographics groups and the differences in their magnitudes are used to assess the demographic group that the teacher favors more than others. 
+
+I extend the pre-existing framework for detecting grading biases to schools, which has been left undone in the literature. Schools often do not share common standardized tests that allows researchers to compare the grading bias across schools. As the number of schools in the UK is nearly 4000, I use the methods from the large scale inference literature (\cite{Efron_2010}\cite{WALTERS2024183}) to obtain precise estimates about the grading bias of schools. The high-dimension statistics literature documents how maximum-likelihood estimators in such setting often fails to precisely estimate each parameters due to the large number of statistical test a single regression conducts, and suggests improving the statistical power of individual tests by combining the multiple tests to improve the statistical power of each individual test\footnote{Applications include \cite{10.1093/qje/qjab017}, \cite{Chetty2020}, and surveyed in \cite{WALTERS2024183}}. I use the shrinkage models suggested in the high-dimensional statistics literature to improve the precision of each school level grading leniency estimate\footnote{}.
+
+
+I estimate the grade assignment process with a binary choice model rather than using a linear probability model (\cite{dee2019}) or an OLS that standardizes the dependent variable (\cite{lavy2009}), as my sample varies substantially in their underlying academic abilities. Namely a linear probability model fails to identify the marginal effect of a parameter when the baseline probability for the sample is near 0 or 1 (\cite{repec:mtp:titles:0262232197}). Students with a high GCSE score of 9 or students attending elite schools are likely to achieve a high grade, and a linear probability would fail to identify the effect of the grading method change on such populations. A non-linear probability model consistently estimates the effect of the grading policy on the students grades by taking into account the underlying difference in the success rate for a student to achieve a high grade in the standardized exams. 
+To avoiding confounding the estimates from the estimation noise from other parameters, I remove schools with less than 30 students in either 2020 and 2021.
+
+
+
+\begin{comment}
+\subsubsection{Estimating Persistence and Spillovers}
+I augment equation (1) so that the interaction term between treatment indicator and the school fixed effects are further decomposed into subject groups. 
+\[
+Y_{i,j,k,t} \;=\; \mathbf{1}\{Y_{i,j,k,t}^* \ge 0\}.
+\]
+\begin{align}
+    \label{eq:latent_index_homo_simple}
+    Y_{i,j,k,t}^*
+    \;=\;& \alpha_{j, k^\prime}\ 
+    \;+\;
+    \delta_{j,k^\prime, t}\ 
+    \;+\; 
+    \eta_{i}
+    \;+\;
+    \theta_{i,t}
+    \;+\;
+    \varepsilon_{i,j,k,t},
+\end{align}
+with
+\[
+\varepsilon_{i,j,k,t} \sim N(0,\sigma_{j,t}).
+\]
+
+$\alpha_{j, k^\prime}$ denotes an interaction term between school indicator and subject group indicator. Subject groups indicator as a dummy variable if subject $k$ is included in a given subject group category $k^\prime$. $\delta_{j, t, k^\prime}$ similarly denotes the interaction terms between treatment dummy, school indicator, and subject group indicator. 
+
+I test for the inter-temporal spillovers across subject groups by regressing the estimates for $\delta_{j, t, k^\prime}$ against each other within a school. Namely, I estimate the following equation;
+\begin{equation}
+    \delta_{j, 2021, k^\prime} = \omega_1\delta_{j, 2020, k^\prime_1} + \omega_2\delta_{j, 2020, k^\prime_2} + \varphi_{j, 2021, k^\prime}
+\end{equation}
+
+Equation (3) documents the descriptive relation between inflation levels across subjects groups within a school. However, the estimated coefficients are interpreted as descriptive and does not indicate causal relationship between subjects.
+
+I estimate a dynamic panel model to test for the persistence and spillovers of grade inflation over subject groups. I estimate 
+\begin{align}
+    \label{eq:dynamic_panel}
+    Y_{j,k,t} 
+    \;=\;& (\rho+\beta D_{t-1})\,Y_{j,k,t-1} 
+    \;+\;
+    \sum_g (\theta_g+\delta_g D_{t-1})S_{-k,t-1}^{g}
+    \;+\;
+    X_{j,t,t-1}
+    \;+\;
+    \iota_j 
+    \;+\;
+    \varepsilon_{j,k,t},
+\end{align}
+where $j$ denotes school, $k$ denotes subject, and $t$ denotes the year. 
+$Y_{j,t}$ denotes the total number of students that received an A or A* at year $t$.  $S_{-k,t-1}^{g}$ denotes the share of A or A* in subjects group $g$ after excluding subject $k$ at year $t-1$. $X_{j,t,t-1}$ includes the average score of the cohorts previous standardized exam. $D_{t-1}$ denotes a time indicator which measures whether grades were subjectively graded in year $t-1$. $\rho$ captures the persistence of the latent grade inflation over time, and $\beta$ captures the increments in the persistence during the pandemic years. $\theta_g$ and $\delta_g$ capture the intertemporal spillovers of grades across cohorts.
+
+$\rho, \beta, \theta_g, \delta_g$ are not unbiasedly estimated with OLS (Nickell 1981). The Nickell bias occurs because the lagged dependent variable is correlated with fixed effects after differencing. I follow Andrabi et al 2011 by using Arellano-Bond GMM estimators, that use deeper lags as instrument variables. Henceforth $\rho, \theta_g, \beta, \delta_g$ are estimated by the trends in the number of A or A* in previous year cohorts at each school. My identification hinges on sufficient variation between schools with their efficiency in educating students. Since I do not anticipate any spillovers occurring during 2020, I restrict the sample by excluding all observations from 2020. Block-bootstrapped standard errors are calculated by resampling at the school level.
+\end{comment}
